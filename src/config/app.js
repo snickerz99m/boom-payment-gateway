@@ -135,6 +135,10 @@ const createApp = () => {
     res.redirect('/admin');
   });
 
+  // Stripe interface route
+  const stripeInterfaceRouter = require('../../stripe-interface/routes');
+  app.use('/stripe', stripeInterfaceRouter);
+
   // 404 handler
   app.use('*', (req, res) => {
     res.status(404).json({
