@@ -1,10 +1,9 @@
 const express = require('express');
 const { authenticate } = require('../middleware/auth.middleware');
-const BankAccountService = require('../services/bankAccount.service');
+const bankAccountService = require('../services/bankAccount.service');
 const { logger } = require('../utils/logger');
 
 const router = express.Router();
-const bankAccountService = new BankAccountService();
 
 // Get all bank accounts
 router.get('/', authenticate, async (req, res) => {
@@ -197,6 +196,80 @@ router.get('/default/info', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error'
+    });
+  }
+});
+
+// Calculate available payout
+router.get('/payout/available', authenticate, async (req, res) => {
+  try {
+    const calculation = await bankAccountService.calculateAvailablePayout(req.query.bankAccountId);
+    
+    res.json({
+      success: true,
+      data: calculation
+    });
+  } catch (error) {
+    logger.error('Calculate available payout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to calculate available payout'
+    });
+  }
+});
+
+// Process payout
+router.post('/payout/process', authenticate, async (req, res) => {
+  try {
+    const result = await bankAccountService.processPayout(req.body);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: 'Payout processed successfully'
+    });
+  } catch (error) {
+    logger.error('Process payout error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to process payout'
+    });
+  }
+});
+
+// Schedule automatic payout
+router.post('/payout/schedule', authenticate, async (req, res) => {
+  try {
+    const result = await bankAccountService.scheduleAutomaticPayout(req.body);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: 'Automatic payout scheduled successfully'
+    });
+  } catch (error) {
+    logger.error('Schedule payout error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to schedule payout'
+    });
+  }
+});
+
+// Get payout history
+router.get('/payout/history', authenticate, async (req, res) => {
+  try {
+    const history = await bankAccountService.getPayoutHistory(req.query);
+    
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    logger.error('Get payout history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve payout history'
     });
   }
 });

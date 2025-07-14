@@ -2,7 +2,8 @@ const express = require('express');
 const { paymentValidators } = require('../validators/payment.validator');
 const { validate } = require('../middleware/validation.middleware');
 const { authenticate } = require('../middleware/auth.middleware');
-const paymentService = require('../services/payment.service');
+// Use standalone payment service for independent operation
+const paymentService = require('../services/standalone.payment.service');
 const { logger } = require('../utils/logger');
 
 const router = express.Router();
