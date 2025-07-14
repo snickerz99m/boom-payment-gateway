@@ -823,6 +823,7 @@ class EnhancedStripeBackend {
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3
         ]);
@@ -830,11 +831,29 @@ class EnhancedStripeBackend {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $info = curl_getinfo($ch);
         
         curl_close($ch);
         
+        // Enhanced error handling for network issues
         if ($response === false || !empty($error)) {
-            throw new Exception('cURL error: ' . $error);
+            // Categorize the error
+            if (strpos($error, 'Could not resolve host') !== false) {
+                throw new Exception('DNS resolution failed: Unable to resolve api.stripe.com. Please check your internet connection.');
+            } elseif (strpos($error, 'Connection timed out') !== false) {
+                throw new Exception('Connection timeout: Unable to connect to Stripe API within timeout period.');
+            } elseif (strpos($error, 'SSL') !== false) {
+                throw new Exception('SSL error: ' . $error . '. Please check your SSL configuration.');
+            } elseif (strpos($error, 'Operation timed out') !== false) {
+                throw new Exception('Request timeout: The request to Stripe API timed out.');
+            } else {
+                throw new Exception('Network error: ' . $error);
+            }
+        }
+        
+        // Handle connection failures
+        if ($httpCode === 0) {
+            throw new Exception('Connection failed: Unable to establish connection to Stripe API.');
         }
         
         $decodedResponse = json_decode($response, true);
@@ -862,6 +881,7 @@ class EnhancedStripeBackend {
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_PROXY => $proxyConfig['host'] . ':' . $proxyConfig['port']
@@ -877,11 +897,33 @@ class EnhancedStripeBackend {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $info = curl_getinfo($ch);
         
         curl_close($ch);
         
+        // Enhanced error handling for proxy and network issues
         if ($response === false || !empty($error)) {
-            throw new Exception('Proxy cURL error: ' . $error);
+            // Categorize the error
+            if (strpos($error, 'Could not resolve proxy') !== false) {
+                throw new Exception('Proxy resolution failed: Unable to resolve proxy host. Please check your proxy settings.');
+            } elseif (strpos($error, 'Could not resolve host') !== false) {
+                throw new Exception('DNS resolution failed: Unable to resolve api.stripe.com through proxy.');
+            } elseif (strpos($error, 'Connection refused') !== false) {
+                throw new Exception('Proxy connection failed: Connection refused by proxy server.');
+            } elseif (strpos($error, 'Proxy CONNECT aborted') !== false) {
+                throw new Exception('Proxy authentication failed: Please check your proxy credentials.');
+            } elseif (strpos($error, 'Connection timed out') !== false) {
+                throw new Exception('Proxy timeout: Connection to proxy server timed out.');
+            } elseif (strpos($error, 'SSL') !== false) {
+                throw new Exception('SSL error through proxy: ' . $error);
+            } else {
+                throw new Exception('Proxy error: ' . $error);
+            }
+        }
+        
+        // Handle connection failures
+        if ($httpCode === 0) {
+            throw new Exception('Proxy connection failed: Unable to establish connection through proxy.');
         }
         
         $decodedResponse = json_decode($response, true);
