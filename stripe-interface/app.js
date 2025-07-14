@@ -175,7 +175,7 @@ class EnhancedStripeGateway {
                     keyValidation.textContent = statusMessage;
                     
                     // Log successful validation
-                    this.logMessage(`✅ Valid Key - ${keyType.toUpperCase()} key validation successful via ${validation.endpoint_tested || '/v1/charges'}`);
+                    this.logMessage(`✅ Valid Key - ${keyType.toUpperCase()} key validation successful via ${validation.endpoint_tested || '/v1/balance'}`);
                 } else {
                     keyValidation.className = 'validation-status invalid';
                     
@@ -625,10 +625,36 @@ class EnhancedStripeGateway {
     
     async processBulkCards(bulkCards, formData) {
         const lines = bulkCards.split('\n').filter(line => line.trim());
-        this.logMessage(`📊 Processing ${lines.length} cards...`);
+        const threads = parseInt(formData.threads) || 1;
+        const delay = parseInt(formData.delay) || 500;
         
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+        this.logMessage(`📊 Processing ${lines.length} cards with ${threads} threads and ${delay}ms delay...`);
+        
+        // Process cards in batches based on thread count
+        const batchSize = Math.ceil(lines.length / threads);
+        const batches = [];
+        
+        for (let i = 0; i < lines.length; i += batchSize) {
+            batches.push(lines.slice(i, i + batchSize));
+        }
+        
+        this.logMessage(`🔄 Split into ${batches.length} batches of ~${batchSize} cards each`);
+        
+        // Process batches concurrently
+        const promises = batches.map((batch, batchIndex) => 
+            this.processBatch(batch, formData, delay, batchIndex + 1)
+        );
+        
+        await Promise.all(promises);
+        
+        this.logMessage(`✅ Bulk processing completed with ${threads} threads`);
+    }
+    
+    async processBatch(batch, formData, delay, batchNumber) {
+        this.logMessage(`🔄 Starting batch ${batchNumber} with ${batch.length} cards...`);
+        
+        for (let i = 0; i < batch.length; i++) {
+            const line = batch[i].trim();
             const parts = line.split('|');
             
             if (parts.length !== 4) {
@@ -648,18 +674,19 @@ class EnhancedStripeGateway {
                 holderName: formData.cardholderName || this.generateRandomName()
             };
             
-            this.logMessage(`🔄 Processing card ${i + 1}/${lines.length}: ${this.maskCardNumber(cardData.cardNumber)}`);
+            const cardIndex = (batchNumber - 1) * batch.length + i + 1;
+            this.logMessage(`🔄 [Batch ${batchNumber}] Processing card ${cardIndex}: ${this.maskCardNumber(cardData.cardNumber)}`);
             
             try {
                 await this.processCard(cardData, formData);
                 
-                // Add small delay between requests to avoid rate limiting
-                if (i < lines.length - 1) {
-                    await this.sleep(500);
+                // Add delay between requests if configured
+                if (delay > 0 && i < batch.length - 1) {
+                    await this.sleep(delay);
                 }
                 
             } catch (error) {
-                this.logMessage(`❌ Error processing card ${i + 1}: ${error.message}`);
+                this.logMessage(`❌ [Batch ${batchNumber}] Error processing card ${cardIndex}: ${error.message}`);
                 this.results.declined.push({
                     cardNumber: cardData.cardNumber,
                     expiry: cardData.expiry,
@@ -671,6 +698,8 @@ class EnhancedStripeGateway {
             
             this.updateResultBoxes();
         }
+        
+        this.logMessage(`✅ Batch ${batchNumber} completed`);
     }
     
     async processSingleCard(formData) {
@@ -704,6 +733,12 @@ class EnhancedStripeGateway {
                 port: formData.proxyPort ? parseInt(formData.proxyPort) : null,
                 username: formData.proxyUsername,
                 password: formData.proxyPassword
+            },
+            threadsConfig: {
+                threads: parseInt(formData.threads) || 1
+            },
+            delayConfig: {
+                delay: parseInt(formData.delay) || 500
             },
             description: formData.description || 'Bulk payment processing',
             userAgent: this.getRandomItem(this.userAgents),
