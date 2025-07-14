@@ -17,13 +17,23 @@ const transactionRoutes = require('../routes/transaction.routes');
 const customerRoutes = require('../routes/customer.routes');
 const webhookRoutes = require('../routes/webhook.routes');
 const authRoutes = require('../routes/auth.routes');
+const systemRoutes = require('../routes/system.routes');
 
 const createApp = () => {
   const app = express();
 
   // Security middleware
   app.use(helmet({
-    contentSecurityPolicy: process.env.HELMET_CSP_ENABLED === 'true',
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"]
+      }
+    },
     hsts: process.env.HELMET_HSTS_ENABLED === 'true'
   }));
 
@@ -107,6 +117,7 @@ const createApp = () => {
   app.use(`/api/${apiVersion}/transactions`, transactionRoutes);
   app.use(`/api/${apiVersion}/customers`, customerRoutes);
   app.use(`/api/${apiVersion}/webhooks`, webhookRoutes);
+  app.use(`/api/${apiVersion}/system`, systemRoutes);
 
   // Static file serving for admin panel
   app.use('/admin', express.static(path.join(__dirname, '../../public/admin')));
