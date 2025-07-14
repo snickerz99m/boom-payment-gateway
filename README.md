@@ -271,6 +271,498 @@ if ($result['success']) {
 
 ---
 
+## 🐍 **Python Integration**
+
+### **Quick Start with Python**
+
+1. **Install dependencies:**
+   ```bash
+   pip install requests
+   ```
+
+2. **Basic payment processing:**
+   ```python
+   import requests
+   import json
+   
+   # Configuration
+   API_URL = "http://localhost:3000/api/v1/payments/process"
+   
+   # Payment data
+   payment_data = {
+       "amount": 2999,  # $29.99 in cents
+       "currency": "USD",
+       "cardData": {
+           "cardNumber": "4111111111111111",
+           "expiryDate": "12/25",
+           "cvv": "123",
+           "cardholderName": "John Doe"
+       },
+       "customerInfo": {
+           "email": "customer@example.com",
+           "firstName": "John",
+           "lastName": "Doe"
+       },
+       "orderId": "ORDER-123",
+       "description": "Product purchase"
+   }
+   
+   # Process payment
+   response = requests.post(API_URL, json=payment_data)
+   result = response.json()
+   
+   if result["success"]:
+       print(f"✅ Payment successful!")
+       print(f"Transaction ID: {result['data']['transaction']['id']}")
+       print(f"Status: {result['data']['transaction']['status']}")
+   else:
+       print(f"❌ Payment failed: {result['message']}")
+   ```
+
+### **Advanced Python Client**
+
+For production use, utilize the comprehensive client library:
+
+```python
+from examples.python.payment_client import PaymentGatewayClient
+
+# Initialize client
+client = PaymentGatewayClient("http://localhost:3000", api_key="your-api-key")
+
+# Process payment
+result = client.process_payment({
+    "amount": 2999,
+    "currency": "USD",
+    "cardData": {
+        "cardNumber": "4111111111111111",
+        "expiryDate": "12/25",
+        "cvv": "123",
+        "cardholderName": "John Doe"
+    },
+    "customerInfo": {
+        "email": "customer@example.com",
+        "firstName": "John",
+        "lastName": "Doe"
+    },
+    "orderId": "ORDER-123",
+    "description": "Product purchase"
+})
+
+print(f"Payment result: {result}")
+```
+
+### **Python Examples Location**
+- **Simple Example:** `examples/python/simple_payment.py`
+- **Full Client Library:** `examples/python/payment_client.py`
+- **Requirements:** `examples/python/requirements.txt`
+
+---
+
+## 🐘 **PHP Integration**
+
+### **Quick Start with PHP**
+
+1. **Basic payment processing:**
+   ```php
+   <?php
+   // Configuration
+   $apiUrl = 'http://localhost:3000/api/v1/payments/process';
+   
+   // Payment data
+   $paymentData = [
+       'amount' => 2999,  // $29.99 in cents
+       'currency' => 'USD',
+       'cardData' => [
+           'cardNumber' => '4111111111111111',
+           'expiryDate' => '12/25',
+           'cvv' => '123',
+           'cardholderName' => 'John Doe'
+       ],
+       'customerInfo' => [
+           'email' => 'customer@example.com',
+           'firstName' => 'John',
+           'lastName' => 'Doe'
+       ],
+       'orderId' => 'ORDER-123',
+       'description' => 'Product purchase'
+   ];
+   
+   // Process payment
+   $ch = curl_init();
+   curl_setopt_array($ch, [
+       CURLOPT_URL => $apiUrl,
+       CURLOPT_RETURNTRANSFER => true,
+       CURLOPT_POST => true,
+       CURLOPT_POSTFIELDS => json_encode($paymentData),
+       CURLOPT_HTTPHEADER => [
+           'Content-Type: application/json',
+           'User-Agent: PHP-Client/1.0'
+       ],
+       CURLOPT_TIMEOUT => 30
+   ]);
+   
+   $response = curl_exec($ch);
+   $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+   curl_close($ch);
+   
+   $result = json_decode($response, true);
+   
+   if ($httpCode === 200 && $result['success']) {
+       echo "✅ Payment successful!\n";
+       echo "Transaction ID: {$result['data']['transaction']['id']}\n";
+       echo "Status: {$result['data']['transaction']['status']}\n";
+   } else {
+       echo "❌ Payment failed: " . ($result['message'] ?? 'Unknown error') . "\n";
+   }
+   ?>
+   ```
+
+### **Advanced PHP Client**
+
+For production use, utilize the comprehensive client library:
+
+```php
+<?php
+require_once 'examples/php/PaymentGatewayClient.php';
+
+// Initialize client
+$client = new PaymentGatewayClient('http://localhost:3000', 'your-api-key');
+
+// Process payment
+$result = $client->processPayment([
+    'amount' => 2999,
+    'currency' => 'USD',
+    'cardData' => [
+        'cardNumber' => '4111111111111111',
+        'expiryDate' => '12/25',
+        'cvv' => '123',
+        'cardholderName' => 'John Doe'
+    ],
+    'customerInfo' => [
+        'email' => 'customer@example.com',
+        'firstName' => 'John',
+        'lastName' => 'Doe'
+    ],
+    'orderId' => 'ORDER-123',
+    'description' => 'Product purchase'
+]);
+
+echo "Payment result: " . json_encode($result, JSON_PRETTY_PRINT);
+?>
+```
+
+### **PHP Examples Location**
+- **Simple Example:** `examples/php/simple_payment.php`
+- **Full Client Library:** `examples/php/PaymentGatewayClient.php`
+
+---
+
+## 🌐 **Cross-PC Connectivity**
+
+### **Network Configuration**
+
+1. **Configure Server for External Access:**
+   ```bash
+   # Update .env file
+   CORS_ORIGIN=http://localhost:3000,https://localhost:3000,http://192.168.1.100:3000,*
+   NODE_ENV=development
+   ```
+
+2. **Start server with external IP binding:**
+   ```bash
+   npm start
+   # Server will be accessible at: http://your-ip:3000
+   ```
+
+3. **Find your IP address:**
+   ```bash
+   # Windows
+   ipconfig
+   
+   # macOS/Linux
+   ifconfig
+   
+   # Or use online tools
+   curl ifconfig.me
+   ```
+
+### **Firewall Configuration**
+
+**Windows:**
+```cmd
+# Allow inbound traffic on port 3000
+netsh advfirewall firewall add rule name="Payment Gateway" dir=in action=allow protocol=TCP localport=3000
+```
+
+**macOS:**
+```bash
+# Allow incoming connections
+sudo pfctl -e
+sudo pfctl -f /etc/pf.conf
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+# Allow port 3000
+sudo ufw allow 3000
+sudo ufw enable
+```
+
+### **Remote Access Examples**
+
+**Python (Remote PC):**
+```python
+# Change API_BASE_URL to your server's IP
+API_BASE_URL = "http://192.168.1.100:3000"  # Replace with your server IP
+```
+
+**PHP (Remote PC):**
+```php
+// Change API URL to your server's IP
+$apiBaseUrl = 'http://192.168.1.100:3000';  // Replace with your server IP
+```
+
+### **Using Ngrok for Internet Access**
+
+1. **Install ngrok:**
+   ```bash
+   # Download from https://ngrok.com/
+   # Or use package managers
+   brew install ngrok  # macOS
+   choco install ngrok  # Windows
+   ```
+
+2. **Start ngrok tunnel:**
+   ```bash
+   # Start your payment gateway first
+   npm start
+   
+   # In another terminal
+   ngrok http 3000
+   ```
+
+3. **Use the provided HTTPS URL:**
+   ```python
+   # Python example with ngrok
+   API_BASE_URL = "https://abc123.ngrok.io"  # Use your ngrok URL
+   ```
+
+---
+
+## 🔐 **Security Configuration**
+
+### **HTTPS Setup**
+
+1. **Generate SSL certificates:**
+   ```bash
+   # Self-signed certificate for development
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+   ```
+
+2. **Update server configuration:**
+   ```javascript
+   // Add to server.js
+   const https = require('https');
+   const fs = require('fs');
+   
+   const options = {
+     key: fs.readFileSync('key.pem'),
+     cert: fs.readFileSync('cert.pem')
+   };
+   
+   https.createServer(options, app).listen(3000, () => {
+     console.log('HTTPS Server running on port 3000');
+   });
+   ```
+
+### **API Key Authentication**
+
+1. **Generate API keys:**
+   ```bash
+   # Add to .env file
+   API_KEYS=your-production-api-key,your-development-api-key
+   ```
+
+2. **Use secure endpoints:**
+   ```python
+   # Python with API key
+   headers = {
+       'Content-Type': 'application/json',
+       'X-API-Key': 'your-api-key'
+   }
+   
+   response = requests.post(
+       'http://localhost:3000/api/v1/payments/process-secure',
+       json=payment_data,
+       headers=headers
+   )
+   ```
+
+   ```php
+   // PHP with API key
+   $headers = [
+       'Content-Type: application/json',
+       'X-API-Key: your-api-key'
+   ];
+   
+   curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+   ```
+
+---
+
+## 🔧 **Troubleshooting**
+
+### **Connection Issues**
+
+**Problem:** Cannot connect to payment gateway
+```
+❌ Connection failed: Connection refused
+```
+
+**Solutions:**
+1. **Check if server is running:**
+   ```bash
+   curl http://localhost:3000/health
+   ```
+
+2. **Verify port is open:**
+   ```bash
+   # Windows
+   netstat -an | findstr :3000
+   
+   # macOS/Linux
+   netstat -an | grep :3000
+   ```
+
+3. **Check firewall settings:**
+   ```bash
+   # Temporarily disable firewall for testing
+   # Windows: Windows Defender Firewall off
+   # macOS: sudo pfctl -d
+   # Linux: sudo ufw disable
+   ```
+
+### **CORS Issues**
+
+**Problem:** Cross-origin requests blocked
+```
+❌ CORS error: Request blocked by CORS policy
+```
+
+**Solutions:**
+1. **Update CORS configuration:**
+   ```env
+   # In .env file
+   CORS_ORIGIN=http://localhost:3000,https://localhost:3000,http://your-client-ip:port,*
+   ```
+
+2. **For development, allow all origins:**
+   ```env
+   CORS_ORIGIN=*
+   NODE_ENV=development
+   ```
+
+### **Payment Processing Issues**
+
+**Problem:** Payment validation errors
+```
+❌ Payment failed: Payment validation failed
+```
+
+**Solutions:**
+1. **Check required fields:**
+   ```javascript
+   // Required fields
+   {
+     "amount": 2999,           // Required: amount in cents
+     "currency": "USD",        // Required: currency code
+     "cardData": {             // Required: card information
+       "cardNumber": "4111111111111111",
+       "expiryDate": "12/25",
+       "cvv": "123",
+       "cardholderName": "John Doe"
+     },
+     "customerInfo": {         // Required: customer information
+       "email": "customer@example.com",
+       "firstName": "John",
+       "lastName": "Doe"
+     }
+   }
+   ```
+
+2. **Validate card data:**
+   ```javascript
+   // Valid test card numbers
+   const testCards = {
+     visa: "4111111111111111",
+     mastercard: "5555555555554444",
+     amex: "378282246310005",
+     discover: "6011111111111117"
+   };
+   ```
+
+### **Authentication Issues**
+
+**Problem:** API key authentication failed
+```
+❌ Invalid or missing API key
+```
+
+**Solutions:**
+1. **Use correct header format:**
+   ```bash
+   # Correct
+   X-API-Key: your-api-key
+   
+   # Incorrect
+   Authorization: Bearer your-api-key
+   ```
+
+2. **Check API key in environment:**
+   ```bash
+   # Verify API_KEYS in .env
+   API_KEYS=key1,key2,key3
+   ```
+
+### **Network Connectivity**
+
+**Problem:** Cannot access from remote PC
+```
+❌ Connection timeout or refused
+```
+
+**Solutions:**
+1. **Check server binding:**
+   ```bash
+   # Server should bind to 0.0.0.0, not 127.0.0.1
+   # Check server.js or use:
+   node server.js --host 0.0.0.0
+   ```
+
+2. **Verify network connectivity:**
+   ```bash
+   # From remote PC
+   ping your-server-ip
+   telnet your-server-ip 3000
+   ```
+
+3. **Check router/network configuration:**
+   - Ensure devices are on same network
+   - Check for network isolation
+   - Verify IP addresses are correct
+
+### **Common Error Messages**
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Connection refused` | Server not running | Start server with `npm start` |
+| `Invalid JSON` | Malformed request | Check request body format |
+| `Rate limit exceeded` | Too many requests | Wait or increase rate limits |
+| `Card validation failed` | Invalid card data | Use valid test card numbers |
+| `Customer not found` | Missing customer info | Include customerInfo in request |
+
+---
+
 ## 📝 **API Documentation**
 
 ### **Authentication**
@@ -289,15 +781,102 @@ Authorization: Bearer <token>
 
 ### **Endpoints**
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/payments/process` | POST | Process a payment |
-| `/api/v1/transactions` | GET | List transactions |
-| `/api/v1/transactions/{id}` | GET | Get transaction details |
-| `/api/v1/customers` | GET | List customers |
-| `/api/v1/customers/{id}` | GET | Get customer details |
-| `/api/v1/payments/{id}/refund` | POST | Process refund |
-| `/api/v1/webhooks/payment` | POST | Payment webhook |
+| Endpoint | Method | Description | Authentication |
+|----------|--------|-------------|----------------|
+| `/api/v1/payments/process` | POST | Process payment (development) | None |
+| `/api/v1/payments/process-secure` | POST | Process payment (production) | API Key |
+| `/api/v1/payments/{id}` | GET | Get payment details | JWT Token |
+| `/api/v1/transactions` | GET | List transactions | JWT Token |
+| `/api/v1/transactions/{id}` | GET | Get transaction details | JWT Token |
+| `/api/v1/customers` | GET | List customers | JWT Token |
+| `/api/v1/customers/{id}` | GET | Get customer details | JWT Token |
+| `/api/v1/payments/{id}/refund` | POST | Process refund | JWT Token |
+| `/api/v1/webhooks/payment` | POST | Payment webhook | Webhook Signature |
+| `/health` | GET | Health check | None |
+
+### **Payment Processing Endpoints**
+
+#### **Process Payment (Development)**
+```javascript
+POST /api/v1/payments/process
+Content-Type: application/json
+
+{
+  "amount": 2999,  // Amount in cents ($29.99)
+  "currency": "USD",
+  "cardData": {
+    "cardNumber": "4111111111111111",
+    "expiryDate": "12/25",
+    "cvv": "123",
+    "cardholderName": "John Doe"
+  },
+  "customerInfo": {
+    "email": "customer@example.com",
+    "firstName": "John",
+    "lastName": "Doe"
+  },
+  "orderId": "ORDER-123",
+  "description": "Product purchase"
+}
+```
+
+**Response:**
+```javascript
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "transaction": {
+      "id": "txn_abc123",
+      "status": "completed",
+      "amount": 29.99,
+      "currency": "USD",
+      "description": "Product purchase",
+      "riskLevel": "low",
+      "createdAt": "2024-01-15T10:30:00Z"
+    },
+    "paymentMethod": {
+      "cardType": "visa",
+      "cardBrand": "visa",
+      "cardLast4": "1111",
+      "expiryDate": "12/25"
+    },
+    "customer": {
+      "id": "cust_xyz789",
+      "email": "customer@example.com",
+      "name": "John Doe"
+    },
+    "gateway": {
+      "responseCode": "00",
+      "responseMessage": "Payment processed successfully",
+      "transactionId": "gw_txn_456"
+    }
+  },
+  "message": "Payment processed successfully"
+}
+```
+
+#### **Process Payment (Production)**
+```javascript
+POST /api/v1/payments/process-secure
+Content-Type: application/json
+X-API-Key: your-api-key
+
+// Same request body as above
+```
+
+### **API Response Format**
+
+All API responses follow this standardized format:
+
+```javascript
+{
+  "success": boolean,
+  "data": object,      // Response data (present on success)
+  "message": string,   // Human-readable message
+  "error": string      // Error details (present on failure, development only)
+}
+```
 
 ---
 
@@ -408,15 +987,43 @@ MIT License - feel free to use this in your projects!
 
 ## 🎉 **Quick Start Checklist**
 
-- [ ] Install Node.js
+### **Basic Setup**
+- [ ] Install Node.js (16.0.0 or higher)
 - [ ] Download/clone project
 - [ ] Run `npm install`
 - [ ] Copy `.env.example` to `.env`
+- [ ] Update `ENCRYPTION_KEY` in `.env` (32 characters)
 - [ ] Run `npm start`
 - [ ] Open `http://localhost:3000/admin`
-- [ ] Login with default credentials
+- [ ] Login with default credentials: `admin@boom-payments.com` / `password`
 - [ ] Change admin password
-- [ ] Test a payment
-- [ ] Integrate with your website
+
+### **API Integration**
+- [ ] Test health endpoint: `GET /health`
+- [ ] Test payment processing: `POST /api/v1/payments/process`
+- [ ] Set up API keys in `.env` for production
+- [ ] Test secure payment endpoint: `POST /api/v1/payments/process-secure`
+
+### **Python Integration**
+- [ ] Install Python dependencies: `pip install -r examples/python/requirements.txt`
+- [ ] Run Python example: `python examples/python/simple_payment.py`
+- [ ] Test Python client library: `python examples/python/payment_client.py`
+
+### **PHP Integration**
+- [ ] Test PHP example: `php examples/php/simple_payment.php`
+- [ ] Test PHP client library: `php examples/php/PaymentGatewayClient.php`
+
+### **Cross-PC Connectivity**
+- [ ] Configure CORS origins in `.env`
+- [ ] Find your IP address: `ipconfig` (Windows) or `ifconfig` (macOS/Linux)
+- [ ] Configure firewall to allow port 3000
+- [ ] Test from remote PC: `curl http://your-ip:3000/health`
+- [ ] Optional: Set up ngrok for internet access
+
+### **Security**
+- [ ] Generate API keys for production
+- [ ] Set up HTTPS certificates
+- [ ] Configure production CORS settings
+- [ ] Test API key authentication
 
 **You're ready to accept payments! 🚀**
