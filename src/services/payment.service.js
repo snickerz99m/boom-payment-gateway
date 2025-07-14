@@ -3,6 +3,7 @@ const { validateCardData, detectCardType, getBin } = require('../utils/cardValid
 const { generateCardToken, decryptCardToken } = require('../utils/encryption');
 const { 
   generateTransactionId, 
+  generateCustomerId,
   toCents, 
   fromCents, 
   validateAmount, 
@@ -235,6 +236,7 @@ class PaymentService {
       if (!customer) {
         // Create new customer
         customer = await Customer.create({
+          customerId: generateCustomerId(),
           email: paymentData.customerInfo.email,
           firstName: paymentData.customerInfo.firstName || 'Guest',
           lastName: paymentData.customerInfo.lastName || 'Customer',
@@ -247,6 +249,7 @@ class PaymentService {
 
     // Create guest customer
     const guestCustomer = await Customer.create({
+      customerId: generateCustomerId(),
       email: `guest_${Date.now()}@example.com`,
       firstName: 'Guest',
       lastName: 'Customer',
@@ -348,6 +351,7 @@ class PaymentService {
     const processingFee = this.calculateProcessingFee(amountInCents);
 
     const transaction = await Transaction.create({
+      transactionId: generateTransactionId(),
       customerId: customer.id,
       paymentMethodId: paymentMethod.id,
       amount: amountInCents,
