@@ -15,9 +15,13 @@ const Transaction = require('../models/Transaction');
 const Refund = require('../models/Refund');
 const Customer = require('../models/Customer');
 
+// Import payment processors
+const StripeService = require('./stripe.service');
+const PayPalService = require('./paypal.service');
+
 /**
  * Refund Service
- * Handles refund processing and management
+ * Handles refund processing with real payment processors
  */
 class RefundService {
   constructor() {
@@ -25,6 +29,10 @@ class RefundService {
     this.refundFeeFixed = 0; // No fixed fee for refunds
     this.maxRefundAmount = 99999999; // $999,999.99 in cents
     this.minRefundAmount = 1; // $0.01 in cents
+    
+    // Initialize payment processors
+    this.stripeService = new StripeService();
+    this.paypalService = new PayPalService();
   }
 
   /**
@@ -265,31 +273,133 @@ class RefundService {
    * @param {object} options - Processing options
    * @returns {object} - Processing result
    */
+  /**
+   * Process refund with real payment gateway
+   * @param {object} refund - Refund object
+   * @param {object} transaction - Original transaction object
+   * @param {object} options - Processing options
+   * @returns {object} - Processing result
+   */
   async processRefundWithGateway(refund, transaction, options = {}) {
+    const startTime = Date.now();
+    
+    try {
+      // Determine which payment processor was used for original transaction
+      const processor = this.determineProcessor(transaction);
+      
+      let processingResult;
+      
+      // Check if we're in test mode and should use simulation
+      if (process.env.PAYMENT_MODE === 'test' || process.env.NODE_ENV === 'development') {
+        processingResult = await this.simulateRefundProcessing(refund, transaction);
+      } else {
+        // Process with real payment gateway
+        switch (processor) {
+          case 'stripe':
+            processingResult = await this.stripeService.processRefund(
+              transaction.gatewayTransactionId,
+              refund.amount
+            );
+            break;
+          case 'paypal':
+            processingResult = await this.paypalService.processRefund(
+              transaction.gatewayTransactionId,
+              refund.amount
+            );
+            break;
+          default:
+            throw new Error(`Unsupported payment processor for refund: ${processor}`);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+
+      // Map gateway response to internal format
+      const result = {
+        status: processingResult.success ? 'completed' : 'failed',
+        responseCode: processingResult.gatewayResponse?.responseCode || 
+                     (processingResult.success ? RESPONSE_CODES.SUCCESS : RESPONSE_CODES.PROCESSING_ERROR),
+        responseMessage: processingResult.gatewayResponse?.responseMessage || 
+                        (processingResult.success ? 'Refund processed successfully' : 'Refund processing failed'),
+        gatewayRefundId: processingResult.refundId,
+        processingTime
+      };
+
+      logger.info(`Refund processing completed in ${processingTime}ms with ${processor}`, {
+        refundId: refund.refundId,
+        transactionId: transaction.transactionId,
+        success: result.status === 'completed',
+        processor
+      });
+
+      return result;
+
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error('Refund processing failed:', error);
+      
+      return {
+        status: 'failed',
+        responseCode: RESPONSE_CODES.PROCESSING_ERROR,
+        responseMessage: 'Refund processing failed',
+        gatewayRefundId: null,
+        processingTime,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Determine which payment processor to use for refund
+   * @param {object} transaction - Original transaction
+   * @returns {string} - Processor name
+   */
+  determineProcessor(transaction) {
+    // Check if transaction has gateway info
+    if (transaction.gatewayTransactionId) {
+      if (transaction.gatewayTransactionId.startsWith('pi_')) {
+        return 'stripe';
+      } else if (transaction.gatewayTransactionId.startsWith('PAY-')) {
+        return 'paypal';
+      }
+    }
+    
+    // Default to configured processor
+    return process.env.PREFERRED_PAYMENT_PROCESSOR || 'stripe';
+  }
+
+  /**
+   * Simulate refund processing for testing
+   * @param {object} refund - Refund object
+   * @param {object} transaction - Original transaction
+   * @returns {object} - Processing result
+   */
+  async simulateRefundProcessing(refund, transaction) {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
 
-    // Simulate refund processing logic
-    let status = 'completed';
-    let responseCode = RESPONSE_CODES.SUCCESS;
-    let responseMessage = 'Refund processed successfully';
-
     // Simulate failure scenarios (5% failure rate)
     if (Math.random() > 0.95) {
-      status = 'failed';
-      responseCode = RESPONSE_CODES.PROCESSING_ERROR;
-      responseMessage = 'Refund processing failed';
+      return {
+        success: false,
+        gatewayResponse: {
+          responseCode: RESPONSE_CODES.PROCESSING_ERROR,
+          responseMessage: 'Refund processing failed'
+        }
+      };
     }
 
     // Generate gateway refund ID
     const gatewayRefundId = `rf_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
     return {
-      status,
-      responseCode,
-      responseMessage,
-      gatewayRefundId,
-      processingTime: Date.now()
+      success: true,
+      refundId: gatewayRefundId,
+      gatewayResponse: {
+        responseCode: RESPONSE_CODES.SUCCESS,
+        responseMessage: 'Refund processed successfully',
+        gatewayRefundId
+      }
     };
   }
 

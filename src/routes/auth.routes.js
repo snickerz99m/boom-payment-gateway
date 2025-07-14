@@ -71,7 +71,7 @@ router.post('/login', validate(authValidators.login), async (req, res) => {
 });
 
 // Verify token endpoint
-router.post('/verify', async (req, res) => {
+router.get('/verify', async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     

@@ -85,6 +85,58 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Get transaction statistics
+router.get('/stats', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const whereClause = {};
+    
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) whereClause.createdAt.$gte = new Date(startDate);
+      if (endDate) whereClause.createdAt.$lte = new Date(endDate);
+    }
+    
+    const { sequelize } = require('../config/database');
+    
+    // Get totals
+    const totals = await Transaction.findOne({
+      where: whereClause,
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalTransactions'],
+        [sequelize.fn('SUM', sequelize.col('amount')), 'totalRevenue'],
+        [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('customer_id'))), 'totalCustomers']
+      ],
+      raw: true
+    });
+    
+    // Get success rate
+    const successCount = await Transaction.count({
+      where: { ...whereClause, status: 'completed' }
+    });
+    
+    const totalCount = await Transaction.count({ where: whereClause });
+    const successRate = totalCount > 0 ? (successCount / totalCount) * 100 : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        totalTransactions: totals.totalTransactions || 0,
+        totalRevenue: (totals.totalRevenue || 0) / 100, // Convert from cents
+        totalCustomers: totals.totalCustomers || 0,
+        successRate: successRate
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Get transaction stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// Get transaction statistics summary
 router.get('/stats/summary', authenticate, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
