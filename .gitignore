@@ -1,0 +1,15 @@
+# Stripe interface generated files
+/stripe-interface/encryption.key
+/stripe-interface/payment_log.txt
+/stripe-interface/rate_limit.json
+
+# Temporary files
+/tmp/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -159,51 +159,64 @@ class EnhancedStripeGateway {
                 if (validation.valid) {
                     keyValidation.className = 'validation-status valid';
                     
-                    let statusMessage = `✅ ${keyType.toUpperCase()} key is valid and active`;
+                    // Clear "Valid Key" message as requested
+                    let statusMessage = `✅ Valid Key - ${keyType.toUpperCase()} key is active and functional`;
                     
-                    // Add account information if available
-                    if (validation.account_id) {
-                        statusMessage += `\n🏦 Account: ${validation.account_id}`;
+                    // Add endpoint information
+                    if (validation.endpoint_tested) {
+                        statusMessage += `\n🎯 Endpoint tested: ${validation.endpoint_tested}`;
                     }
                     
-                    if (validation.country) {
-                        statusMessage += `\n🌍 Country: ${validation.country}`;
-                    }
-                    
-                    if (validation.charges_enabled !== undefined) {
-                        statusMessage += `\n💳 Charges: ${validation.charges_enabled ? 'Enabled' : 'Disabled'}`;
-                    }
-                    
-                    if (validation.payouts_enabled !== undefined) {
-                        statusMessage += `\n💰 Payouts: ${validation.payouts_enabled ? 'Enabled' : 'Disabled'}`;
+                    // Add timestamp
+                    if (validation.timestamp) {
+                        statusMessage += `\n⏰ Validated at: ${validation.timestamp}`;
                     }
                     
                     keyValidation.textContent = statusMessage;
                     
                     // Log successful validation
-                    this.logMessage(`✅ ${keyType.toUpperCase()} key validation successful`);
+                    this.logMessage(`✅ Valid Key - ${keyType.toUpperCase()} key validation successful via ${validation.endpoint_tested || '/v1/charges'}`);
                 } else {
                     keyValidation.className = 'validation-status invalid';
-                    keyValidation.textContent = `❌ ${validation.message}`;
                     
-                    // Show error suggestions if available
-                    if (validation.suggestions) {
-                        keyValidation.textContent += '\n💡 Suggestions:\n' + validation.suggestions.join('\n');
+                    // Clear "Invalid Key" message as requested
+                    let statusMessage = `❌ Invalid Key - ${validation.message}`;
+                    
+                    // Add HTTP status if available
+                    if (validation.http_status) {
+                        statusMessage += `\n📊 HTTP Status: ${validation.http_status}`;
                     }
                     
-                    // Log validation failure
-                    this.logMessage(`❌ Key validation failed: ${validation.message}`);
+                    // Add endpoint information
+                    if (validation.endpoint_tested) {
+                        statusMessage += `\n🎯 Endpoint tested: ${validation.endpoint_tested}`;
+                    }
+                    
+                    // Add error code if available
+                    if (validation.error_code && validation.error_code !== 'unknown') {
+                        statusMessage += `\n⚠️ Error Code: ${validation.error_code}`;
+                    }
+                    
+                    // Add timestamp
+                    if (validation.timestamp) {
+                        statusMessage += `\n⏰ Failed at: ${validation.timestamp}`;
+                    }
+                    
+                    keyValidation.textContent = statusMessage;
+                    
+                    // Log validation failure with enhanced details
+                    this.logMessage(`❌ Invalid Key - ${validation.message} (HTTP: ${validation.http_status || 'N/A'}, Code: ${validation.error_code || 'N/A'})`);
                 }
             } else {
                 keyValidation.className = 'validation-status invalid';
-                keyValidation.textContent = `❌ Validation failed: ${result.message || 'Unknown error'}`;
-                this.logMessage(`❌ Key validation error: ${result.message || 'Unknown error'}`);
+                keyValidation.textContent = `❌ Invalid Key - Validation failed: ${result.message || 'Unknown error'}`;
+                this.logMessage(`❌ Invalid Key - Validation error: ${result.message || 'Unknown error'}`);
             }
             
         } catch (error) {
             keyValidation.className = 'validation-status invalid';
-            keyValidation.textContent = `❌ Network error: ${error.message}`;
-            this.logMessage(`❌ Key validation network error: ${error.message}`);
+            keyValidation.textContent = `❌ Invalid Key - Network error: ${error.message}`;
+            this.logMessage(`❌ Invalid Key - Network error during validation: ${error.message}`);
         }
     }
     
@@ -282,14 +295,25 @@ class EnhancedStripeGateway {
                 line += ` [ID: ${result.details.transactionId}]`;
             }
             
-            // Add error details for failed transactions
+            // Add enhanced error details for failed transactions
             if (result.details && result.details.errorType) {
                 line += ` [Type: ${result.details.errorType}]`;
+                
                 if (result.details.declineCode && result.details.declineCode !== 'unknown') {
                     line += ` [Code: ${result.details.declineCode}]`;
                 }
+                
                 if (result.details.httpStatus) {
                     line += ` [HTTP: ${result.details.httpStatus}]`;
+                }
+                
+                if (result.details.timestamp) {
+                    line += ` [Time: ${new Date(result.details.timestamp).toLocaleTimeString()}]`;
+                }
+                
+                // Add suggestions on separate lines for better readability
+                if (result.details.suggestions && result.details.suggestions.length > 0) {
+                    line += '\n    💡 Suggestions: ' + result.details.suggestions.join(', ');
                 }
             }
             
@@ -748,7 +772,9 @@ class EnhancedStripeGateway {
                 errorType: response.error_type || 'unknown',
                 declineCode: response.decline_code || 'unknown',
                 httpStatus: response.http_status || null,
-                suggestions: response.suggestions || []
+                suggestions: response.suggestions || [],
+                responseBody: response.response_body || null,
+                timestamp: response.timestamp || new Date().toISOString()
             };
             
             // Handle different types of failures with specific categories
@@ -776,7 +802,7 @@ class EnhancedStripeGateway {
                     
                 case 'card_error':
                 default:
-                    // Card-specific errors
+                    // Card-specific errors with enhanced categorization
                     if (errorMessage.includes('cvv') || errorMessage.includes('cvc')) {
                         result.status = 'CVV_ISSUE';
                         result.reason = 'CVV verification failed';
@@ -808,11 +834,32 @@ class EnhancedStripeGateway {
         
         // Enhanced logging with more details
         const statusIcon = this.getStatusIcon(result.status);
-        this.logMessage(`${statusIcon} ${result.status}: ${this.maskCardNumber(result.cardNumber)} - ${result.reason}`);
+        const maskedCard = this.maskCardNumber(result.cardNumber);
+        let logMessage = `${statusIcon} ${result.status}: ${maskedCard} - ${result.reason}`;
+        
+        // Add HTTP status and error details to log
+        if (!response.success && result.details) {
+            if (result.details.httpStatus) {
+                logMessage += ` (HTTP: ${result.details.httpStatus})`;
+            }
+            if (result.details.errorType && result.details.errorType !== 'unknown') {
+                logMessage += ` (Type: ${result.details.errorType})`;
+            }
+            if (result.details.declineCode && result.details.declineCode !== 'unknown') {
+                logMessage += ` (Code: ${result.details.declineCode})`;
+            }
+        }
+        
+        this.logMessage(logMessage);
         
         // Log additional details for errors
         if (!response.success && result.details && result.details.suggestions.length > 0) {
-            this.logMessage(`💡 Suggestions: ${result.details.suggestions.join(', ')}`);
+            this.logMessage(`💡 Suggestions for ${maskedCard}: ${result.details.suggestions.join(', ')}`);
+        }
+        
+        // Log response body for network errors in debug mode
+        if (!response.success && result.details && result.details.responseBody && result.details.errorType === 'network_error') {
+            this.logMessage(`🔍 Network error details for ${maskedCard}: ${JSON.stringify(result.details.responseBody)}`);
         }
     }
     
