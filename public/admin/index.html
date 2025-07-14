@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOOM Payment Gateway - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="d-flex">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h4><i class="fas fa-bolt text-warning"></i> BOOM Admin</h4>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="#" onclick="loadPage('dashboard')" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li><a href="#" onclick="loadPage('transactions')"><i class="fas fa-credit-card"></i> Transactions</a></li>
+                <li><a href="#" onclick="loadPage('customers')"><i class="fas fa-users"></i> Customers</a></li>
+                <li><a href="#" onclick="loadPage('orders')"><i class="fas fa-shopping-cart"></i> Orders</a></li>
+                <li><a href="#" onclick="loadPage('payouts')"><i class="fas fa-money-check-alt"></i> Payouts</a></li>
+                <li><a href="#" onclick="loadPage('refunds')"><i class="fas fa-undo"></i> Refunds</a></li>
+                <li><a href="#" onclick="loadPage('banks')"><i class="fas fa-university"></i> Bank Accounts</a></li>
+                <li><a href="#" onclick="loadPage('users')"><i class="fas fa-user-shield"></i> Users</a></li>
+                <li><a href="#" onclick="loadPage('settings')"><i class="fas fa-cog"></i> Settings</a></li>
+                <li><a href="#" onclick="loadPage('logs')"><i class="fas fa-file-alt"></i> Logs</a></li>
+                <li><a href="#" onclick="loadPage('analytics')"><i class="fas fa-chart-line"></i> Analytics</a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="system-controls">
+                    <button class="btn btn-warning btn-sm" onclick="pauseSystem()">
+                        <i class="fas fa-pause"></i> Pause System
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="restartSystem()">
+                        <i class="fas fa-restart"></i> Restart
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div id="content" class="main-content">
+            <!-- Top Navigation -->
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <div class="container-fluid">
+                    <button type="button" id="sidebarToggle" class="btn btn-light">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="navbar-nav ms-auto">
+                        <div class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user"></i> Admin
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-user-edit"></i> Profile</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-key"></i> Change Password</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Page Content -->
+            <main class="container-fluid p-4">
+                <div id="page-content">
+                    <!-- Dashboard will be loaded here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">
+                        <i class="fas fa-bolt text-warning"></i> BOOM Payment Gateway Login
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Login</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
