@@ -25,7 +25,7 @@
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             padding: 40px;
-            max-width: 600px;
+            max-width: 1200px;
             width: 100%;
             margin: 20px;
         }
@@ -182,31 +182,206 @@
             color: #856404;
             margin-bottom: 10px;
         }
+        
+        .validation-status {
+            margin-top: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .validation-status.valid {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .validation-status.invalid {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .validation-status.checking {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            display: block;
+        }
+        
+        .bulk-info {
+            margin-top: 8px;
+        }
+        
+        .bulk-info small {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        
+        .single-card-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .single-card-section h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .results-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .result-header {
+            background: #343a40;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .result-header h3 {
+            margin: 0;
+            font-size: 1.1em;
+        }
+        
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: #218838;
+        }
+        
+        .copy-btn:active {
+            background: #1e7e34;
+        }
+        
+        .result-content {
+            padding: 15px 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        
+        .result-content:empty:before {
+            content: "No results yet...";
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .card-item {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .card-item .card-number {
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .card-item .card-status {
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        
+        .card-item .card-details {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .status-authorized {
+            color: #28a745;
+        }
+        
+        .status-charged {
+            color: #007bff;
+        }
+        
+        .status-declined {
+            color: #dc3545;
+        }
+        
+        .status-cvv-issue {
+            color: #fd7e14;
+        }
+        
+        .status-valid {
+            color: #20c997;
+        }
+        
+        .processing-step {
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .processing-step:last-child {
+            border-bottom: none;
+        }
+        
+        .processing-step .timestamp {
+            color: #6c757d;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🚀 Stripe Payment Gateway</h1>
-            <p>Secure Payment Processing with Advanced Features</p>
+            <p>Advanced Card Validation & Bulk Processing System</p>
         </div>
         
         <div class="security-info">
-            <h3>Security Features</h3>
+            <h3>Features</h3>
             <ul>
-                <li>AES-256 encryption for sensitive data</li>
-                <li>Real user-agent rotation</li>
-                <li>Proxy support for anonymous routing</li>
-                <li>Random user data generation</li>
-                <li>Rate limiting and fraud prevention</li>
+                <li>Bulk card processing with detailed status reporting</li>
+                <li>Real-time Stripe key validation</li>
+                <li>Automatic email and name generation</li>
+                <li>Separate result boxes for different card statuses</li>
+                <li>Copy functionality for easy result management</li>
             </ul>
         </div>
         
         <form id="paymentForm">
             <div class="form-group">
-                <label for="stripeSecretKey">Stripe Secret Key (sk_test_... or sk_live_...)</label>
+                <label for="stripeSecretKey">Stripe Secret Key (sk_live_... or sk_test_...)</label>
                 <input type="password" id="stripeSecretKey" name="stripeSecretKey" required 
-                       placeholder="sk_test_51A..." autocomplete="off">
+                       placeholder="sk_live_51A..." autocomplete="off">
+                <div class="validation-status" id="keyValidation"></div>
             </div>
             
             <div class="form-group">
@@ -240,36 +415,48 @@
                 </div>
             </div>
             
-            <div class="row">
-                <div class="col">
-                    <div class="form-group">
-                        <label for="cardNumber">Card Number</label>
-                        <input type="text" id="cardNumber" name="cardNumber" 
-                               placeholder="4111 1111 1111 1111" required autocomplete="cc-number">
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="form-group">
-                        <label for="expiry">Expiry (MM/YY)</label>
-                        <input type="text" id="expiry" name="expiry" placeholder="12/25" 
-                               required autocomplete="cc-exp">
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="form-group">
-                        <label for="cvv">CVV</label>
-                        <input type="text" id="cvv" name="cvv" placeholder="123" 
-                               required autocomplete="cc-csc">
-                    </div>
+            <div class="form-group">
+                <label for="bulkCards">Bulk Cards (One per line - Format: cardnum|mm|yy|cvv or cardnum|mm|yyyy|cvv)</label>
+                <textarea id="bulkCards" name="bulkCards" rows="8" 
+                          placeholder="4111111111111111|12|25|123&#10;5555555555554444|01|26|456&#10;378282246310005|03|25|1234&#10;6011111111111117|05|24|789"></textarea>
+                <div class="bulk-info">
+                    <small>💡 Paste multiple cards here, one per line. Single card processing will be used if bulk cards are empty.</small>
                 </div>
             </div>
             
-            <div class="row">
-                <div class="col">
-                    <div class="form-group">
-                        <label for="cardholderName">Cardholder Name</label>
-                        <input type="text" id="cardholderName" name="cardholderName" 
-                               placeholder="John Doe" required autocomplete="cc-name">
+            <div class="single-card-section">
+                <h3>Single Card Processing (if bulk cards empty)</h3>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="cardNumber">Card Number</label>
+                            <input type="text" id="cardNumber" name="cardNumber" 
+                                   placeholder="4111 1111 1111 1111" autocomplete="cc-number">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="expiry">Expiry (MM/YY)</label>
+                            <input type="text" id="expiry" name="expiry" placeholder="12/25" 
+                                   autocomplete="cc-exp">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="cvv">CVV</label>
+                            <input type="text" id="cvv" name="cvv" placeholder="123" 
+                                   autocomplete="cc-csc">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="cardholderName">Cardholder Name (Auto-generated if empty)</label>
+                            <input type="text" id="cardholderName" name="cardholderName" 
+                                   placeholder="Leave empty for auto-generation" autocomplete="cc-name">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -323,13 +510,94 @@
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Processing payment securely...</p>
+            <p>Processing payments securely...</p>
         </div>
         
-        <div class="result" id="result">
-            <!-- Results will appear here -->
+        <div class="results-container" id="resultsContainer">
+            <!-- Authorized Cards -->
+            <div class="result-box" id="authorizedBox">
+                <div class="result-header">
+                    <h3>✅ Authorized Cards</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('authorizedCards')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="authorizedCards"></div>
+            </div>
+            
+            <!-- Charged Cards -->
+            <div class="result-box" id="chargedBox">
+                <div class="result-header">
+                    <h3>💰 Charged Cards</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('chargedCards')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="chargedCards"></div>
+            </div>
+            
+            <!-- Declined Cards -->
+            <div class="result-box" id="declinedBox">
+                <div class="result-header">
+                    <h3>❌ Declined Cards</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('declinedCards')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="declinedCards"></div>
+            </div>
+            
+            <!-- CVV Issues (CCN Cards) -->
+            <div class="result-box" id="cvvIssuesBox">
+                <div class="result-header">
+                    <h3>🔒 CVV Issues (CCN Cards)</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('cvvIssues')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="cvvIssues"></div>
+            </div>
+            
+            <!-- Valid Cards (Ready for Charging) -->
+            <div class="result-box" id="validBox">
+                <div class="result-header">
+                    <h3>🟢 Valid Cards (Ready for Charging)</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('validCards')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="validCards"></div>
+            </div>
+            
+            <!-- Processing Log -->
+            <div class="result-box" id="logBox">
+                <div class="result-header">
+                    <h3>📋 Processing Log</h3>
+                    <button type="button" class="copy-btn" onclick="copyResultBox('processingLog')">📋 Copy</button>
+                </div>
+                <div class="result-content" id="processingLog"></div>
+            </div>
         </div>
     </div>
+    
+    <script>
+        // Copy functionality for result boxes
+        function copyResultBox(elementId) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            const text = element.textContent || element.innerText;
+            
+            // Create temporary textarea
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            // Show feedback
+            const copyBtn = event.target;
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✅ Copied!';
+            copyBtn.style.background = '#28a745';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.background = '#28a745';
+            }, 2000);
+        }
+    </script>
     
     <script src="app.js"></script>
 </body>
