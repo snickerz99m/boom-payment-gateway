@@ -74,6 +74,9 @@ const createApp = () => {
   // Static file serving for admin panel
   app.use('/admin', express.static(path.join(__dirname, '../../public/admin')));
 
+  // Static file serving for demo
+  app.use('/demo', express.static(path.join(__dirname, '../../public/demo')));
+
   // Redirect root to admin panel
   app.get('/', (req, res) => {
     res.redirect('/admin');
