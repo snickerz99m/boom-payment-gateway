@@ -2,26 +2,65 @@ const express = require('express');
 const { paymentValidators } = require('../validators/payment.validator');
 const { validate } = require('../middleware/validation.middleware');
 const { authenticate } = require('../middleware/auth.middleware');
-const { paymentService } = require('../services/payment.service');
+const paymentService = require('../services/payment.service');
 const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
-// Process payment endpoint
+// Process payment endpoint (no auth required for easier integration)
 router.post('/process', validate(paymentValidators.processPayment), async (req, res) => {
   try {
     const result = await paymentService.processPayment(req.body);
     
     res.json({
       success: true,
-      data: result
+      data: result,
+      message: 'Payment processed successfully'
     });
     
   } catch (error) {
     logger.error('Payment processing error:', error);
     res.status(400).json({
       success: false,
-      message: error.message || 'Payment processing failed'
+      message: error.message || 'Payment processing failed',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Process payment endpoint with API key authentication (for production)
+router.post('/process-secure', [
+  (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    const validApiKeys = (process.env.API_KEYS || '').split(',').filter(key => key.trim());
+    
+    if (!apiKey || !validApiKeys.includes(apiKey)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or missing API key',
+        error: 'AUTHENTICATION_ERROR'
+      });
+    }
+    
+    next();
+  },
+  validate(paymentValidators.processPayment)
+], async (req, res) => {
+  try {
+    const result = await paymentService.processPayment(req.body);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: 'Payment processed successfully'
+    });
+    
+  } catch (error) {
+    logger.error('Payment processing error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Payment processing failed',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

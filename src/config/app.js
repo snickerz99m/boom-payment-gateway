@@ -27,13 +27,50 @@ const createApp = () => {
     hsts: process.env.HELMET_HSTS_ENABLED === 'true'
   }));
 
-  // CORS configuration
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  // CORS configuration - Enhanced for cross-PC connectivity
+  const corsOptions = {
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      
+      // Parse allowed origins from environment
+      const allowedOrigins = process.env.CORS_ORIGIN ? 
+        process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 
+        ['http://localhost:3000'];
+      
+      // Allow all origins in development mode
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      // Check if origin is in allowed list
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      
+      // Allow localhost variants for development
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+      
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-  }));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With',
+      'X-API-Key',
+      'X-Webhook-Signature',
+      'Accept',
+      'Origin',
+      'User-Agent'
+    ],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Count']
+  };
+  
+  app.use(cors(corsOptions));
 
   // Body parsing middleware
   app.use(express.json({ limit: '10mb' }));
