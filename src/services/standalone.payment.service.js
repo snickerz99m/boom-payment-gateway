@@ -376,6 +376,14 @@ class StandalonePaymentService {
       errors.push('Test card declined');
     }
 
+    logger.info('Card validation for processing:', {
+      cardValidation: cardValidation.isValid,
+      expiryValidation: expiryValidation,
+      cvvValidation: cardData.cvv ? validateCvv(cardData.cvv, detectCardType(cardData.cardNumber)) : 'not_provided',
+      errors: errors,
+      cvvResult: cvvResult
+    });
+
     return {
       isValid: errors.length === 0,
       errors,
