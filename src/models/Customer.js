@@ -144,9 +144,16 @@ const Customer = sequelize.define('Customer', {
   },
   // Metadata
   metadata: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('metadata');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('metadata', JSON.stringify(value || {}));
+    }
   },
   createdAt: {
     type: DataTypes.DATE,

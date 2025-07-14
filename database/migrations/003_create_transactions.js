@@ -84,9 +84,9 @@ module.exports = {
         defaultValue: 0
       },
       risk_factors: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: []
+        defaultValue: '[]'
       },
       gateway_response_code: {
         type: DataTypes.STRING,
@@ -133,14 +133,14 @@ module.exports = {
         allowNull: true
       },
       order_details: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       customer_info: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       ip_address: {
         type: DataTypes.STRING,
@@ -155,14 +155,14 @@ module.exports = {
         allowNull: true
       },
       billing_address: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       shipping_address: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       webhook_sent: {
         type: DataTypes.BOOLEAN,
@@ -183,9 +183,9 @@ module.exports = {
         allowNull: true
       },
       metadata: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       created_at: {
         type: DataTypes.DATE,

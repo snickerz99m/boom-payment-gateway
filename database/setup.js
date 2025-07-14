@@ -112,9 +112,8 @@ const initializeDatabase = async () => {
     // Set up associations
     setupAssociations();
 
-    // Sync models (alter existing tables if needed)
-    await sequelize.sync({ alter: true });
-    logger.info('Database models synchronized successfully');
+    // Don't sync models for SQLite, use migrations only
+    logger.info('Database models associations set up successfully');
 
     logger.info('Database initialization completed successfully');
   } catch (error) {
@@ -151,37 +150,24 @@ const dropAllTables = async () => {
   }
 };
 
-// Create database if it doesn't exist
+// Create database if it doesn't exist (SQLite automatically creates the file)
 const createDatabase = async () => {
   try {
-    const dbName = process.env.DB_NAME || 'payments';
-    const { Client } = require('pg');
+    const path = require('path');
+    const fs = require('fs');
     
-    const client = new Client({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      user: process.env.DB_USER || 'username',
-      password: process.env.DB_PASSWORD || 'password',
-      database: 'postgres' // Connect to default postgres database
-    });
-
-    await client.connect();
+    const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'data', 'payments.db');
+    const dbDir = path.dirname(dbPath);
     
-    // Check if database exists
-    const result = await client.query(
-      'SELECT 1 FROM pg_database WHERE datname = $1',
-      [dbName]
-    );
-
-    if (result.rows.length === 0) {
-      logger.info(`Creating database: ${dbName}`);
-      await client.query(`CREATE DATABASE "${dbName}"`);
-      logger.info(`Database ${dbName} created successfully`);
-    } else {
-      logger.info(`Database ${dbName} already exists`);
+    // Ensure database directory exists
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      logger.info(`Created database directory: ${dbDir}`);
     }
-
-    await client.end();
+    
+    // SQLite will create the database file automatically when we first connect
+    logger.info(`SQLite database will be created at: ${dbPath}`);
+    
   } catch (error) {
     logger.error('Database creation failed:', error);
     throw error;

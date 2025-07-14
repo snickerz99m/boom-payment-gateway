@@ -141,9 +141,16 @@ const PaymentMethod = sequelize.define('PaymentMethod', {
     defaultValue: 'low'
   },
   riskFactors: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: []
+    defaultValue: '[]',
+    get() {
+      const rawValue = this.getDataValue('riskFactors');
+      return rawValue ? JSON.parse(rawValue) : [];
+    },
+    set(value) {
+      this.setDataValue('riskFactors', JSON.stringify(value || []));
+    }
   },
   // Validation results
   cvvSupported: {
@@ -158,9 +165,16 @@ const PaymentMethod = sequelize.define('PaymentMethod', {
   },
   // Metadata
   metadata: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('metadata');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('metadata', JSON.stringify(value || {}));
+    }
   },
   createdAt: {
     type: DataTypes.DATE,

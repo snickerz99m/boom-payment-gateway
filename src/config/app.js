@@ -7,7 +7,7 @@ require('dotenv').config();
 
 // Import middleware
 const authMiddleware = require('../middleware/auth.middleware');
-const errorMiddleware = require('../middleware/error.middleware');
+const { errorHandler } = require('../middleware/error.middleware');
 const rateLimitMiddleware = require('../middleware/rateLimit.middleware');
 
 // Import routes
@@ -80,7 +80,7 @@ const createApp = () => {
   });
 
   // Error handling middleware (must be last)
-  app.use(errorMiddleware);
+  app.use(errorHandler);
 
   return app;
 };

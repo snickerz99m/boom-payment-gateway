@@ -156,9 +156,9 @@ module.exports = {
         allowNull: true
       },
       metadata: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       created_at: {
         type: DataTypes.DATE,

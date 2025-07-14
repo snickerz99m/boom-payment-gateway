@@ -91,9 +91,16 @@ const Transaction = sequelize.define('Transaction', {
     defaultValue: 0
   },
   riskFactors: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: []
+    defaultValue: '[]',
+    get() {
+      const rawValue = this.getDataValue('riskFactors');
+      return rawValue ? JSON.parse(rawValue) : [];
+    },
+    set(value) {
+      this.setDataValue('riskFactors', JSON.stringify(value || []));
+    }
   },
   // Gateway response
   gatewayResponseCode: {
@@ -149,15 +156,29 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: true
   },
   orderDetails: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('orderDetails');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('orderDetails', JSON.stringify(value || {}));
+    }
   },
   // Customer information at time of transaction
   customerInfo: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('customerInfo');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('customerInfo', JSON.stringify(value || {}));
+    }
   },
   // Request information
   ipAddress: {
@@ -174,15 +195,29 @@ const Transaction = sequelize.define('Transaction', {
   },
   // Billing information
   billingAddress: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('billingAddress');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('billingAddress', JSON.stringify(value || {}));
+    }
   },
   // Shipping information
   shippingAddress: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('shippingAddress');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('shippingAddress', JSON.stringify(value || {}));
+    }
   },
   // Notification status
   webhookSent: {
@@ -205,9 +240,16 @@ const Transaction = sequelize.define('Transaction', {
   },
   // Metadata
   metadata: {
-    type: DataTypes.JSONB,
+    type: DataTypes.TEXT,
     allowNull: true,
-    defaultValue: {}
+    defaultValue: '{}',
+    get() {
+      const rawValue = this.getDataValue('metadata');
+      return rawValue ? JSON.parse(rawValue) : {};
+    },
+    set(value) {
+      this.setDataValue('metadata', JSON.stringify(value || {}));
+    }
   },
   // Timestamps
   createdAt: {

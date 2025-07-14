@@ -116,9 +116,9 @@ module.exports = {
         defaultValue: 'low'
       },
       risk_factors: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: []
+        defaultValue: '[]'
       },
       cvv_supported: {
         type: DataTypes.BOOLEAN,
@@ -131,9 +131,9 @@ module.exports = {
         defaultValue: true
       },
       metadata: {
-        type: DataTypes.JSONB,
+        type: DataTypes.TEXT,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: '{}'
       },
       created_at: {
         type: DataTypes.DATE,
