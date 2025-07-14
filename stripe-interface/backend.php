@@ -235,36 +235,74 @@ class EnhancedStripeBackend {
      */
     private function validateStripeKeyAlive($stripeKey) {
         try {
-            // Test key by making a simple API call to retrieve account info
-            $response = $this->makeStripeRequest($stripeKey, '/v1/account', [], []);
+            // Test key by making a simple API call to the charges endpoint
+            // This is the recommended approach for validating sk_live keys
+            $response = $this->makeStripeRequest($stripeKey, '/v1/charges', [], []);
             
-            // Log successful validation
+            // Log successful validation with detailed information
             $this->logValidationResult($stripeKey, true, 'Key validation successful', $response);
             
             return [
                 'valid' => true,
                 'message' => 'Valid Stripe key with proper permissions',
-                'account_id' => $response['id'] ?? null,
-                'account_type' => $response['type'] ?? null,
-                'country' => $response['country'] ?? null,
-                'charges_enabled' => $response['charges_enabled'] ?? false,
-                'payouts_enabled' => $response['payouts_enabled'] ?? false
+                'endpoint_tested' => '/v1/charges',
+                'key_type' => $this->getKeyType($stripeKey),
+                'response_received' => true,
+                'timestamp' => date('Y-m-d H:i:s')
             ];
         } catch (Exception $e) {
-            // Parse error details
+            // Parse error details with enhanced information
             $errorDetails = $this->parseStripeError($e->getMessage());
             
-            // Log failed validation
-            $this->logValidationResult($stripeKey, false, $e->getMessage(), null);
+            // Extract HTTP status code and response body from error message
+            $httpStatus = $this->extractHttpStatus($e->getMessage());
+            $responseBody = $this->extractResponseBody($e->getMessage());
+            
+            // Enhanced logging with HTTP status codes, error messages, and response bodies
+            $this->logValidationResult($stripeKey, false, $e->getMessage(), [
+                'http_status' => $httpStatus,
+                'response_body' => $responseBody,
+                'error_details' => $errorDetails,
+                'endpoint_tested' => '/v1/charges',
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
             
             return [
                 'valid' => false,
                 'message' => $errorDetails['message'],
                 'error_code' => $errorDetails['code'],
                 'error_type' => $errorDetails['type'],
-                'raw_error' => $e->getMessage()
+                'http_status' => $httpStatus,
+                'response_body' => $responseBody,
+                'endpoint_tested' => '/v1/charges',
+                'raw_error' => $e->getMessage(),
+                'timestamp' => date('Y-m-d H:i:s')
             ];
         }
+    }
+    
+    /**
+     * Extract HTTP status code from error message
+     */
+    private function extractHttpStatus($errorMessage) {
+        if (preg_match('/HTTP.*?(\d{3})/', $errorMessage, $matches)) {
+            return intval($matches[1]);
+        }
+        return null;
+    }
+    
+    /**
+     * Extract response body from error message
+     */
+    private function extractResponseBody($errorMessage) {
+        // Try to extract JSON response from error message
+        if (preg_match('/\{.*\}/', $errorMessage, $matches)) {
+            $json = json_decode($matches[0], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $json;
+            }
+        }
+        return null;
     }
     
     /**
@@ -335,7 +373,7 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Log validation result with detailed information
+     * Log validation result with detailed information including HTTP status codes and response bodies
      */
     private function logValidationResult($stripeKey, $success, $message, $response) {
         $logEntry = [
@@ -346,15 +384,41 @@ class EnhancedStripeBackend {
             'key_prefix' => substr($stripeKey, 0, 20) . '...',
             'validation_success' => $success,
             'message' => $message,
-            'response_summary' => $response ? [
-                'account_id' => $response['id'] ?? null,
-                'charges_enabled' => $response['charges_enabled'] ?? null,
-                'payouts_enabled' => $response['payouts_enabled'] ?? null,
-                'country' => $response['country'] ?? null
-            ] : null
+            'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/charges'
         ];
         
+        if ($success) {
+            // For successful validations, log basic response info
+            $logEntry['response_summary'] = [
+                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/charges',
+                'response_received' => $response['response_received'] ?? true,
+                'timestamp' => $response['timestamp'] ?? date('Y-m-d H:i:s')
+            ];
+        } else {
+            // For failed validations, log detailed error information
+            $logEntry['error_details'] = [
+                'http_status' => $response['http_status'] ?? null,
+                'response_body' => $response['response_body'] ?? null,
+                'error_details' => $response['error_details'] ?? null,
+                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/charges',
+                'timestamp' => $response['timestamp'] ?? date('Y-m-d H:i:s')
+            ];
+            
+            // Add network-specific information for network errors
+            if (isset($response['error_details']['type']) && $response['error_details']['type'] === 'network_error') {
+                $logEntry['network_info'] = [
+                    'curl_version' => curl_version()['version'] ?? 'unknown',
+                    'ssl_version' => curl_version()['ssl_version'] ?? 'unknown',
+                    'proxy_configured' => !empty($_POST['proxyConfig']['host']) || !empty($_REQUEST['proxyConfig']['host'])
+                ];
+            }
+        }
+        
+        // Write detailed log entry
         file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        
+        // Also log to error_log for server-level monitoring
+        error_log("Stripe Key Validation: " . ($success ? 'SUCCESS' : 'FAILED') . " - " . $message . " - Key: " . substr($stripeKey, 0, 20) . '...');
     }
     
     /**
@@ -809,7 +873,7 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Make direct request to Stripe
+     * Make direct request to Stripe with enhanced error handling
      */
     private function makeDirectRequest($url, $postData, $headers) {
         $ch = curl_init();
@@ -825,45 +889,107 @@ class EnhancedStripeBackend {
             CURLOPT_TIMEOUT => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_HEADER => true,
+            CURLOPT_VERBOSE => false
         ]);
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $error = curl_error($ch);
         $info = curl_getinfo($ch);
         
         curl_close($ch);
         
-        // Enhanced error handling for network issues
+        // Enhanced error handling for network issues with detailed logging
         if ($response === false || !empty($error)) {
-            // Categorize the error
+            $errorMessage = '';
+            
+            // Categorize the error with detailed information
             if (strpos($error, 'Could not resolve host') !== false) {
-                throw new Exception('DNS resolution failed: Unable to resolve api.stripe.com. Please check your internet connection.');
+                $errorMessage = 'DNS resolution failed: Unable to resolve api.stripe.com. Please check your internet connection. HTTP Status: ' . $httpCode;
             } elseif (strpos($error, 'Connection timed out') !== false) {
-                throw new Exception('Connection timeout: Unable to connect to Stripe API within timeout period.');
+                $errorMessage = 'Connection timeout: Unable to connect to Stripe API within timeout period. HTTP Status: ' . $httpCode;
             } elseif (strpos($error, 'SSL') !== false) {
-                throw new Exception('SSL error: ' . $error . '. Please check your SSL configuration.');
+                $errorMessage = 'SSL error: ' . $error . '. Please check your SSL configuration. HTTP Status: ' . $httpCode;
             } elseif (strpos($error, 'Operation timed out') !== false) {
-                throw new Exception('Request timeout: The request to Stripe API timed out.');
+                $errorMessage = 'Request timeout: The request to Stripe API timed out. HTTP Status: ' . $httpCode;
             } else {
-                throw new Exception('Network error: ' . $error);
+                $errorMessage = 'Network error: ' . $error . '. HTTP Status: ' . $httpCode;
             }
+            
+            // Log detailed error information
+            $this->logDetailedNetworkError($url, $postData, $headers, $error, $httpCode, $info);
+            
+            throw new Exception($errorMessage);
         }
         
         // Handle connection failures
         if ($httpCode === 0) {
-            throw new Exception('Connection failed: Unable to establish connection to Stripe API.');
-        }
-        
-        $decodedResponse = json_decode($response, true);
-        
-        if ($httpCode >= 400) {
-            $errorMessage = $decodedResponse['error']['message'] ?? 'Unknown Stripe error';
+            $errorMessage = 'Connection failed: Unable to establish connection to Stripe API. HTTP Status: ' . $httpCode;
+            $this->logDetailedNetworkError($url, $postData, $headers, 'Connection failed', $httpCode, $info);
             throw new Exception($errorMessage);
         }
         
+        // Separate header and body
+        $header = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+        
+        $decodedResponse = json_decode($body, true);
+        
+        // Enhanced error handling for HTTP errors
+        if ($httpCode >= 400) {
+            $errorMessage = $decodedResponse['error']['message'] ?? 'Unknown Stripe error';
+            
+            // Log the HTTP error with full details
+            $this->logDetailedHttpError($url, $postData, $headers, $httpCode, $decodedResponse, $header);
+            
+            // Include HTTP status and response body in the exception message
+            throw new Exception($errorMessage . ' | HTTP Status: ' . $httpCode . ' | Response: ' . json_encode($decodedResponse));
+        }
+        
         return $decodedResponse;
+    }
+    
+    /**
+     * Log detailed network error information
+     */
+    private function logDetailedNetworkError($url, $postData, $headers, $error, $httpCode, $info) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'type' => 'network_error',
+            'url' => $url,
+            'http_status' => $httpCode,
+            'curl_error' => $error,
+            'curl_info' => $info,
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+            'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'Unknown'
+        ];
+        
+        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        error_log("Stripe Network Error: " . $error . " - HTTP Status: " . $httpCode . " - URL: " . $url);
+    }
+    
+    /**
+     * Log detailed HTTP error information
+     */
+    private function logDetailedHttpError($url, $postData, $headers, $httpCode, $responseBody, $responseHeaders) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'type' => 'http_error',
+            'url' => $url,
+            'http_status' => $httpCode,
+            'response_body' => $responseBody,
+            'response_headers' => $responseHeaders,
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+            'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'Unknown'
+        ];
+        
+        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        error_log("Stripe HTTP Error: HTTP Status " . $httpCode . " - URL: " . $url . " - Response: " . json_encode($responseBody));
     }
     
     /**
