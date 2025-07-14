@@ -8,6 +8,8 @@ const Customer = require('../src/models/Customer');
 const PaymentMethod = require('../src/models/PaymentMethod');
 const Transaction = require('../src/models/Transaction');
 const Refund = require('../src/models/Refund');
+const BankAccount = require('../src/models/BankAccount');
+const Payout = require('../src/models/Payout');
 
 // Define associations
 const setupAssociations = () => {
@@ -59,6 +61,16 @@ const setupAssociations = () => {
   Refund.belongsTo(Customer, {
     foreignKey: 'customerId',
     as: 'customer'
+  });
+
+  // BankAccount has many Payouts
+  BankAccount.hasMany(Payout, {
+    foreignKey: 'bankAccountId',
+    as: 'payouts'
+  });
+  Payout.belongsTo(BankAccount, {
+    foreignKey: 'bankAccountId',
+    as: 'bankAccount'
   });
 
   logger.info('Database associations set up successfully');

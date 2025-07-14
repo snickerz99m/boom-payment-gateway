@@ -49,6 +49,36 @@ const generateRefundId = () => {
 };
 
 /**
+ * Generate a unique account ID
+ * @returns {string} - Account ID
+ */
+const generateAccountId = () => {
+  try {
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substring(2, 15);
+    return `acc_${timestamp}_${randomPart}`;
+  } catch (error) {
+    logger.error('Account ID generation failed:', error);
+    return `acc_${uuidv4()}`;
+  }
+};
+
+/**
+ * Generate a unique payout ID
+ * @returns {string} - Payout ID
+ */
+const generatePayoutId = () => {
+  try {
+    const timestamp = Date.now().toString(36);
+    const randomPart = Math.random().toString(36).substring(2, 15);
+    return `payout_${timestamp}_${randomPart}`;
+  } catch (error) {
+    logger.error('Payout ID generation failed:', error);
+    return `payout_${uuidv4()}`;
+  }
+};
+
+/**
  * Convert amount to cents
  * @param {number} amount - Amount in dollars
  * @returns {number} - Amount in cents
@@ -481,6 +511,8 @@ module.exports = {
   generateTransactionId,
   generateCustomerId,
   generateRefundId,
+  generateAccountId,
+  generatePayoutId,
   toCents,
   fromCents,
   formatAmount,

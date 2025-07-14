@@ -16,6 +16,8 @@ const transactionRoutes = require('../routes/transaction.routes');
 const customerRoutes = require('../routes/customer.routes');
 const webhookRoutes = require('../routes/webhook.routes');
 const authRoutes = require('../routes/auth.routes');
+const bankAccountRoutes = require('../routes/bankaccount.routes');
+const payoutRoutes = require('../routes/payout.routes');
 
 const createApp = () => {
   const app = express();
@@ -69,6 +71,8 @@ const createApp = () => {
   app.use(`/api/${apiVersion}/transactions`, transactionRoutes);
   app.use(`/api/${apiVersion}/customers`, customerRoutes);
   app.use(`/api/${apiVersion}/webhooks`, webhookRoutes);
+  app.use(`/api/${apiVersion}/bank-accounts`, bankAccountRoutes);
+  app.use(`/api/${apiVersion}/payouts`, payoutRoutes);
 
   // 404 handler
   app.use('*', (req, res) => {

@@ -22,7 +22,7 @@ const generateJWTSecret = () => {
 
 // Generate encryption key (32 bytes for AES-256)
 const generateEncryptionKey = () => {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString('hex').substring(0, 32);
 };
 
 // Generate webhook secret
