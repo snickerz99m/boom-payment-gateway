@@ -1,4 +1,4 @@
-const paypal = require('@paypal/checkout-server-sdk');
+const { Client, Environment, LogLevel } = require('@paypal/paypal-server-sdk');
 const { logger } = require('../utils/logger');
 
 class PayPalService {
@@ -24,20 +24,42 @@ class PayPalService {
       if (!clientId || !clientSecret) {
         logger.warn('PayPal credentials not configured. Using sandbox mode.');
         // Use sandbox credentials for development
-        const environment = new paypal.core.SandboxEnvironment(
-          'demo_client_id',
-          'demo_client_secret'
-        );
-        this.client = new paypal.core.PayPalHttpClient(environment);
-        this.initialized = true;
-        return;
+        this.client = new Client({
+          clientCredentialsAuthCredentials: {
+            oAuthClientId: 'demo_client_id',
+            oAuthClientSecret: 'demo_client_secret'
+          },
+          environment: Environment.Sandbox,
+          logging: {
+            logLevel: LogLevel.Info,
+            logRequest: {
+              logBody: true
+            },
+            logResponse: {
+              logHeaders: true
+            }
+          }
+        });
+      } else {
+        const environment = this.mode === 'live' ? Environment.Production : Environment.Sandbox;
+        this.client = new Client({
+          clientCredentialsAuthCredentials: {
+            oAuthClientId: clientId,
+            oAuthClientSecret: clientSecret
+          },
+          environment: environment,
+          logging: {
+            logLevel: LogLevel.Info,
+            logRequest: {
+              logBody: true
+            },
+            logResponse: {
+              logHeaders: true
+            }
+          }
+        });
       }
 
-      const environment = this.mode === 'live' 
-        ? new paypal.core.LiveEnvironment(clientId, clientSecret)
-        : new paypal.core.SandboxEnvironment(clientId, clientSecret);
-
-      this.client = new paypal.core.PayPalHttpClient(environment);
       this.initialized = true;
       logger.info(`PayPal initialized in ${this.mode} mode`);
     } catch (error) {
@@ -57,10 +79,8 @@ class PayPalService {
     try {
       const { amount, currency, cardData, customerData, description } = paymentData;
 
-      // Create order
-      const request = new paypal.orders.OrdersCreateRequest();
-      request.prefer('return=representation');
-      request.requestBody({
+      // Create order using the new SDK
+      const orderRequest = {
         intent: 'CAPTURE',
         purchase_units: [{
           amount: {
@@ -84,15 +104,18 @@ class PayPalService {
             name: cardData.cardholderName
           }
         }
+      };
+
+      const order = await this.client.ordersController.ordersCreate({
+        body: orderRequest,
+        prefer: 'return=representation'
       });
 
-      const order = await this.client.execute(request);
-
       // Capture payment
-      const captureRequest = new paypal.orders.OrdersCaptureRequest(order.result.id);
-      captureRequest.requestBody({});
-
-      const capture = await this.client.execute(captureRequest);
+      const capture = await this.client.ordersController.ordersCapture({
+        id: order.result.id,
+        body: {}
+      });
 
       logger.info(`PayPal payment processed: ${capture.result.id}`);
 
@@ -142,15 +165,17 @@ class PayPalService {
     }
 
     try {
-      const request = new paypal.payments.CapturesRefundRequest(transactionId);
-      request.requestBody({
+      const refundRequest = {
         amount: amount ? {
           currency_code: 'USD',
           value: (amount / 100).toFixed(2)
         } : undefined
-      });
+      };
 
-      const refund = await this.client.execute(request);
+      const refund = await this.client.paymentsController.capturesRefund({
+        captureId: transactionId,
+        body: refundRequest
+      });
 
       logger.info(`PayPal refund processed: ${refund.result.id}`);
 
@@ -266,8 +291,9 @@ class PayPalService {
     }
 
     try {
-      const request = new paypal.payments.CapturesGetRequest(captureId);
-      const capture = await this.client.execute(request);
+      const capture = await this.client.paymentsController.capturesGet({
+        captureId: captureId
+      });
       
       return {
         success: true,
