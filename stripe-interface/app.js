@@ -124,6 +124,17 @@ class EnhancedStripeGateway {
         return true;
     }
     
+    /**
+     * Comprehensive Stripe key validation
+     * 
+     * This method validates Stripe keys by:
+     * 1. Checking the key format locally (must start with sk_test_ or sk_live_)
+     * 2. Sending the key to the backend for API validation
+     * 3. Displaying detailed validation results with error handling
+     * 4. Providing helpful suggestions for common error types
+     * 
+     * @param {string} key - The Stripe secret key to validate
+     */
     async validateStripeKeyComprehensive(key) {
         const keyValidation = document.getElementById('keyValidation');
         
@@ -135,10 +146,10 @@ class EnhancedStripeGateway {
         keyValidation.textContent = '🔍 Validating key with Stripe API...';
         
         try {
-            // Encrypt the key for transmission
+            // Encrypt the key for transmission (using base64 encoding for key validation)
             const encryptedKey = this.encryptData(key);
             
-            // Make validation request
+            // Make validation request to backend
             const response = await fetch('backend.php', {
                 method: 'POST',
                 headers: {
@@ -159,64 +170,88 @@ class EnhancedStripeGateway {
                 if (validation.valid) {
                     keyValidation.className = 'validation-status valid';
                     
-                    // Clear "Valid Key" message as requested
-                    let statusMessage = `✅ Valid Key - ${keyType.toUpperCase()} key is active and functional`;
+                    // Build comprehensive success message
+                    let statusMessage = `✅ Valid ${keyType.toUpperCase()} Key - Active and functional`;
                     
                     // Add endpoint information
                     if (validation.endpoint_tested) {
-                        statusMessage += `\n🎯 Endpoint tested: ${validation.endpoint_tested}`;
+                        statusMessage += `\n🎯 Endpoint: ${validation.endpoint_tested}`;
+                    }
+                    
+                    // Add balance information if available
+                    if (validation.balance_available) {
+                        statusMessage += `\n💰 Balance: Available funds detected`;
                     }
                     
                     // Add timestamp
                     if (validation.timestamp) {
-                        statusMessage += `\n⏰ Validated at: ${validation.timestamp}`;
+                        statusMessage += `\n⏰ Validated: ${validation.timestamp}`;
                     }
                     
                     keyValidation.textContent = statusMessage;
                     
                     // Log successful validation
-                    this.logMessage(`✅ Valid Key - ${keyType.toUpperCase()} key validation successful via ${validation.endpoint_tested || '/v1/balance'}`);
+                    this.logMessage(`✅ ${keyType.toUpperCase()} Key Validation - SUCCESS via ${validation.endpoint_tested || '/v1/balance'}`);
                 } else {
                     keyValidation.className = 'validation-status invalid';
                     
-                    // Clear "Invalid Key" message as requested
-                    let statusMessage = `❌ Invalid Key - ${validation.message}`;
+                    // Build comprehensive error message
+                    let statusMessage = `❌ Invalid ${keyType.toUpperCase()} Key`;
+                    
+                    // Add main error message
+                    if (validation.message) {
+                        statusMessage += `\n📝 Error: ${validation.message}`;
+                    }
                     
                     // Add HTTP status if available
                     if (validation.http_status) {
                         statusMessage += `\n📊 HTTP Status: ${validation.http_status}`;
                     }
                     
-                    // Add endpoint information
-                    if (validation.endpoint_tested) {
-                        statusMessage += `\n🎯 Endpoint tested: ${validation.endpoint_tested}`;
+                    // Add error code if available and not unknown
+                    if (validation.error_code && validation.error_code !== 'unknown_error') {
+                        statusMessage += `\n⚠️ Error Code: ${validation.error_code}`;
                     }
                     
-                    // Add error code if available
-                    if (validation.error_code && validation.error_code !== 'unknown') {
-                        statusMessage += `\n⚠️ Error Code: ${validation.error_code}`;
+                    // Add error type if available
+                    if (validation.error_type && validation.error_type !== 'api_error') {
+                        statusMessage += `\n🔍 Error Type: ${validation.error_type}`;
+                    }
+                    
+                    // Add endpoint information
+                    if (validation.endpoint_tested) {
+                        statusMessage += `\n🎯 Endpoint: ${validation.endpoint_tested}`;
                     }
                     
                     // Add timestamp
                     if (validation.timestamp) {
-                        statusMessage += `\n⏰ Failed at: ${validation.timestamp}`;
+                        statusMessage += `\n⏰ Failed: ${validation.timestamp}`;
+                    }
+                    
+                    // Add helpful suggestions for common errors
+                    if (validation.error_type === 'network_error') {
+                        statusMessage += `\n💡 Check your internet connection and try again`;
+                    } else if (validation.error_type === 'authentication_error') {
+                        statusMessage += `\n💡 Verify the key is active in your Stripe dashboard`;
+                    } else if (validation.error_type === 'permission_error') {
+                        statusMessage += `\n💡 Contact Stripe support to activate your account`;
                     }
                     
                     keyValidation.textContent = statusMessage;
                     
                     // Log validation failure with enhanced details
-                    this.logMessage(`❌ Invalid Key - ${validation.message} (HTTP: ${validation.http_status || 'N/A'}, Code: ${validation.error_code || 'N/A'})`);
+                    this.logMessage(`❌ ${keyType.toUpperCase()} Key Validation - FAILED: ${validation.message} (${validation.error_code})`);
                 }
             } else {
                 keyValidation.className = 'validation-status invalid';
-                keyValidation.textContent = `❌ Invalid Key - Validation failed: ${result.message || 'Unknown error'}`;
-                this.logMessage(`❌ Invalid Key - Validation error: ${result.message || 'Unknown error'}`);
+                keyValidation.textContent = `❌ Validation Error\n📝 ${result.error || 'Unknown error occurred'}`;
+                this.logMessage(`❌ Key Validation - ERROR: ${result.error || 'Unknown error'}`);
             }
             
         } catch (error) {
             keyValidation.className = 'validation-status invalid';
-            keyValidation.textContent = `❌ Invalid Key - Network error: ${error.message}`;
-            this.logMessage(`❌ Invalid Key - Network error during validation: ${error.message}`);
+            keyValidation.textContent = `❌ Network Error\n📝 ${error.message}\n💡 Check your connection and try again`;
+            this.logMessage(`❌ Key Validation - Network Error: ${error.message}`);
         }
     }
     
@@ -961,6 +996,18 @@ class EnhancedStripeGateway {
         return result;
     }
     
+    /**
+     * Encrypt data for transmission
+     * 
+     * For key validation, we use simple base64 encoding instead of full encryption
+     * to avoid the complexity of client-side encryption while still providing
+     * basic obfuscation during transmission. The backend handles this properly
+     * by attempting base64 decode first, then falling back to full decryption
+     * for backward compatibility.
+     * 
+     * @param {string} data - The data to encode
+     * @returns {string} Base64 encoded data
+     */
     encryptData(data) {
         // Simple client-side encoding (backend handles real encryption)
         return btoa(data);
