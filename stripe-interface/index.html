@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payment Gateway - Secure Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            margin: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .col {
+            flex: 1;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .security-info {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .security-info h3 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        
+        .security-info ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .security-info li {
+            padding: 5px 0;
+            color: #6c757d;
+        }
+        
+        .security-info li::before {
+            content: "🔒 ";
+            margin-right: 5px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .proxy-settings {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .proxy-settings h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Stripe Payment Gateway</h1>
+            <p>Secure Payment Processing with Advanced Features</p>
+        </div>
+        
+        <div class="security-info">
+            <h3>Security Features</h3>
+            <ul>
+                <li>AES-256 encryption for sensitive data</li>
+                <li>Real user-agent rotation</li>
+                <li>Proxy support for anonymous routing</li>
+                <li>Random user data generation</li>
+                <li>Rate limiting and fraud prevention</li>
+            </ul>
+        </div>
+        
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="stripeSecretKey">Stripe Secret Key (sk_test_... or sk_live_...)</label>
+                <input type="password" id="stripeSecretKey" name="stripeSecretKey" required 
+                       placeholder="sk_test_51A..." autocomplete="off">
+            </div>
+            
+            <div class="form-group">
+                <label for="operation">Operation Type</label>
+                <select id="operation" name="operation" required>
+                    <option value="">Select Operation</option>
+                    <option value="auth">$0 Authorization</option>
+                    <option value="charge">Charge</option>
+                    <option value="auth_capture">Auth & Capture</option>
+                </select>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="amount">Amount (USD)</label>
+                        <input type="number" id="amount" name="amount" step="0.01" min="0" 
+                               placeholder="29.99" required>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="currency">Currency</label>
+                        <select id="currency" name="currency" required>
+                            <option value="usd">USD</option>
+                            <option value="eur">EUR</option>
+                            <option value="gbp">GBP</option>
+                            <option value="cad">CAD</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="cardNumber">Card Number</label>
+                        <input type="text" id="cardNumber" name="cardNumber" 
+                               placeholder="4111 1111 1111 1111" required autocomplete="cc-number">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="expiry">Expiry (MM/YY)</label>
+                        <input type="text" id="expiry" name="expiry" placeholder="12/25" 
+                               required autocomplete="cc-exp">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="cvv">CVV</label>
+                        <input type="text" id="cvv" name="cvv" placeholder="123" 
+                               required autocomplete="cc-csc">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="cardholderName">Cardholder Name</label>
+                        <input type="text" id="cardholderName" name="cardholderName" 
+                               placeholder="John Doe" required autocomplete="cc-name">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="proxy-settings">
+                <h3>Proxy Settings (Optional)</h3>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="proxyHost">Proxy Host</label>
+                            <input type="text" id="proxyHost" name="proxyHost" 
+                                   placeholder="proxy.example.com">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="proxyPort">Proxy Port</label>
+                            <input type="number" id="proxyPort" name="proxyPort" 
+                                   placeholder="8080">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="proxyUsername">Proxy Username (Optional)</label>
+                            <input type="text" id="proxyUsername" name="proxyUsername" 
+                                   placeholder="username">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="proxyPassword">Proxy Password (Optional)</label>
+                            <input type="password" id="proxyPassword" name="proxyPassword" 
+                                   placeholder="password">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Transaction Description</label>
+                <textarea id="description" name="description" rows="3" 
+                          placeholder="Payment for premium service..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">
+                🚀 Process Payment
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing payment securely...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <!-- Results will appear here -->
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

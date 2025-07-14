@@ -93,3 +93,8 @@ dist
 
 # DynamoDB Local files
 .dynamodb/
+
+# Stripe interface temporary files
+stripe-interface/encryption.key
+stripe-interface/rate_limit.json
+stripe-interface/payment_log.txt
