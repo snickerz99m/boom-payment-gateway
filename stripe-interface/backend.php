@@ -105,6 +105,13 @@ class EnhancedStripeBackend {
     
     /**
      * Handle key validation requests
+     * 
+     * This method validates Stripe secret keys by:
+     * 1. Accepting base64 encoded keys from the frontend (for security)
+     * 2. Attempting to decode the key - falls back to decryption for backward compatibility
+     * 3. Validating the key format (must start with sk_test_ or sk_live_)
+     * 4. Making a test request to Stripe's /v1/balance endpoint
+     * 5. Returning detailed validation results with error handling
      */
     private function handleKeyValidation($input) {
         try {
@@ -114,8 +121,26 @@ class EnhancedStripeBackend {
                 return;
             }
             
-            // Decrypt Stripe secret key
-            $stripeSecretKey = $this->decryptData($input['stripeSecretKey']);
+            // For key validation, we expect base64 encoded key from frontend
+            // Try to decode the key - if it fails, try to decrypt it (backward compatibility)
+            $stripeSecretKey = null;
+            
+            // First, try base64 decoding (new approach for key validation)
+            $decodedKey = base64_decode($input['stripeSecretKey'], true);
+            if ($decodedKey !== false && $this->isValidStripeKey($decodedKey)) {
+                $stripeSecretKey = $decodedKey;
+                $this->logMessage('Key validation using base64 decoding');
+            } else {
+                // Fallback to decryption (for backward compatibility)
+                try {
+                    $stripeSecretKey = $this->decryptData($input['stripeSecretKey']);
+                    $this->logMessage('Key validation using decryption');
+                } catch (Exception $e) {
+                    $this->logError('Both base64 decode and decryption failed: ' . $e->getMessage());
+                    $this->sendErrorResponse('Invalid key format - unable to decode', 400);
+                    return;
+                }
+            }
             
             // Validate key format
             if (!$this->isValidStripeKey($stripeSecretKey)) {
@@ -294,9 +319,18 @@ class EnhancedStripeBackend {
     
     /**
      * Validate if Stripe key is alive and has proper permissions
+     * 
+     * This method tests the Stripe key by making a request to the /v1/balance endpoint,
+     * which is the recommended approach for validating API keys according to Stripe documentation.
+     * 
+     * @param string $stripeKey The Stripe secret key to validate
+     * @return array Validation result with detailed error information
      */
     private function validateStripeKeyAlive($stripeKey) {
         try {
+            // Log the validation attempt
+            $this->logMessage("Validating Stripe key: " . $this->getKeyType($stripeKey) . " key");
+            
             // Test key by making a simple API call to the balance endpoint
             // This is the recommended approach for validating Stripe keys
             $response = $this->makeStripeRequest($stripeKey, '/v1/balance', [], []);
@@ -310,7 +344,9 @@ class EnhancedStripeBackend {
                 'endpoint_tested' => '/v1/balance',
                 'key_type' => $this->getKeyType($stripeKey),
                 'response_received' => true,
-                'timestamp' => date('Y-m-d H:i:s')
+                'timestamp' => date('Y-m-d H:i:s'),
+                'balance_available' => isset($response['available']) ? $response['available'] : null,
+                'balance_pending' => isset($response['pending']) ? $response['pending'] : null
             ];
         } catch (Exception $e) {
             // Parse error details with enhanced information
