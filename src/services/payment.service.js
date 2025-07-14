@@ -645,21 +645,6 @@ class PaymentService {
       }
     };
   }
-      }
-    }
-
-    // Generate gateway transaction ID
-    const gatewayTransactionId = `gw_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-
-    return {
-      status,
-      responseCode,
-      responseMessage,
-      gatewayTransactionId,
-      cvvResult,
-      processingTime: Date.now()
-    };
-  }
 
   /**
    * Get transaction by ID

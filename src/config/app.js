@@ -18,6 +18,7 @@ const customerRoutes = require('../routes/customer.routes');
 const webhookRoutes = require('../routes/webhook.routes');
 const authRoutes = require('../routes/auth.routes');
 const systemRoutes = require('../routes/system.routes');
+const bankAccountRoutes = require('../routes/bankAccount.routes');
 
 const createApp = () => {
   const app = express();
@@ -118,6 +119,7 @@ const createApp = () => {
   app.use(`/api/${apiVersion}/customers`, customerRoutes);
   app.use(`/api/${apiVersion}/webhooks`, webhookRoutes);
   app.use(`/api/${apiVersion}/system`, systemRoutes);
+  app.use(`/api/${apiVersion}/bank-accounts`, bankAccountRoutes);
 
   // Static file serving for admin panel
   app.use('/admin', express.static(path.join(__dirname, '../../public/admin')));

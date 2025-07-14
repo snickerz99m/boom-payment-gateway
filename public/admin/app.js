@@ -436,46 +436,150 @@ class AdminPanel {
     }
 
     async loadBankAccounts() {
-        const content = `
-            <div class="form-container">
-                <h5>Bank Account Management</h5>
-                <button class="btn btn-primary mb-3" onclick="addBankAccount()">
-                    <i class="fas fa-plus"></i> Add Bank Account
-                </button>
-                
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Bank Name</th>
-                                <th>Account Number</th>
-                                <th>Account Type</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Sample Bank</td>
-                                <td>****1234</td>
-                                <td>Checking</td>
-                                <td><span class="badge bg-success">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-warning">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+        try {
+            const bankAccounts = await this.apiCall('GET', '/bank-accounts');
+            
+            const content = `
+                <div class="form-container">
+                    <h5>Bank Account Management</h5>
+                    <button class="btn btn-primary mb-3" onclick="showAddBankAccountModal()">
+                        <i class="fas fa-plus"></i> Add Bank Account
+                    </button>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Bank Name</th>
+                                    <th>Account Number</th>
+                                    <th>Account Type</th>
+                                    <th>Status</th>
+                                    <th>Verification</th>
+                                    <th>Default</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${this.renderBankAccountRows(bankAccounts.data || [])}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-        `;
 
-        document.getElementById('page-content').innerHTML = content;
+                <!-- Add Bank Account Modal -->
+                <div class="modal fade" id="addBankAccountModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Bank Account</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="addBankAccountForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Bank Name</label>
+                                        <input type="text" class="form-control" name="bankName" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Account Holder Name</label>
+                                        <input type="text" class="form-control" name="accountHolderName" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Account Number</label>
+                                        <input type="text" class="form-control" name="accountNumber" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Routing Number</label>
+                                        <input type="text" class="form-control" name="routingNumber" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Account Type</label>
+                                        <select class="form-control" name="accountType" required>
+                                            <option value="checking">Checking</option>
+                                            <option value="savings">Savings</option>
+                                            <option value="business">Business</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Country</label>
+                                        <select class="form-control" name="country">
+                                            <option value="US">United States</option>
+                                            <option value="CA">Canada</option>
+                                            <option value="GB">United Kingdom</option>
+                                        </select>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="addBankAccount()">Add Account</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('page-content').innerHTML = content;
+        } catch (error) {
+            this.showAlert('Error loading bank accounts: ' + error.message, 'danger');
+        }
+    }
+
+    renderBankAccountRows(bankAccounts) {
+        return bankAccounts.map(account => `
+            <tr>
+                <td>${account.bankName}</td>
+                <td>${account.maskedAccountNumber}</td>
+                <td>${account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1)}</td>
+                <td>
+                    <span class="badge ${this.getStatusBadgeClass(account.status)}">${account.status}</span>
+                </td>
+                <td>
+                    <span class="badge ${this.getVerificationBadgeClass(account.verificationStatus)}">${account.verificationStatus}</span>
+                </td>
+                <td>
+                    ${account.isDefault ? '<i class="fas fa-check text-success"></i>' : ''}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editBankAccount('${account.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${!account.isDefault ? `
+                        <button class="btn btn-sm btn-success" onclick="setDefaultBankAccount('${account.id}')">
+                            <i class="fas fa-star"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-warning" onclick="verifyBankAccount('${account.id}')">
+                        <i class="fas fa-check-circle"></i>
+                    </button>
+                    ${!account.isDefault ? `
+                        <button class="btn btn-sm btn-danger" onclick="deleteBankAccount('${account.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    getStatusBadgeClass(status) {
+        const classes = {
+            'active': 'bg-success',
+            'inactive': 'bg-secondary',
+            'pending_verification': 'bg-warning',
+            'suspended': 'bg-danger'
+        };
+        return classes[status] || 'bg-secondary';
+    }
+
+    getVerificationBadgeClass(status) {
+        const classes = {
+            'verified': 'bg-success',
+            'unverified': 'bg-secondary',
+            'pending': 'bg-warning',
+            'failed': 'bg-danger'
+        };
+        return classes[status] || 'bg-secondary';
     }
 
     async loadSettings() {
@@ -618,5 +722,85 @@ function addCustomer() {
 }
 
 function addBankAccount() {
-    alert('Add bank account');
+    const form = document.getElementById('addBankAccountForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    adminPanel.apiCall('POST', '/bank-accounts', data)
+        .then(response => {
+            if (response.success) {
+                adminPanel.showAlert('Bank account added successfully', 'success');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addBankAccountModal'));
+                modal.hide();
+                adminPanel.loadBankAccounts();
+            } else {
+                adminPanel.showAlert('Failed to add bank account: ' + response.message, 'danger');
+            }
+        })
+        .catch(error => {
+            adminPanel.showAlert('Error adding bank account: ' + error.message, 'danger');
+        });
+}
+
+function showAddBankAccountModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addBankAccountModal'));
+    modal.show();
+}
+
+function editBankAccount(id) {
+    alert('Edit bank account: ' + id);
+}
+
+function setDefaultBankAccount(id) {
+    if (confirm('Set this bank account as default?')) {
+        adminPanel.apiCall('POST', `/bank-accounts/${id}/set-default`)
+            .then(response => {
+                if (response.success) {
+                    adminPanel.showAlert('Default bank account set successfully', 'success');
+                    adminPanel.loadBankAccounts();
+                } else {
+                    adminPanel.showAlert('Failed to set default bank account: ' + response.message, 'danger');
+                }
+            })
+            .catch(error => {
+                adminPanel.showAlert('Error setting default bank account: ' + error.message, 'danger');
+            });
+    }
+}
+
+function verifyBankAccount(id) {
+    if (confirm('Verify this bank account?')) {
+        adminPanel.apiCall('POST', `/bank-accounts/${id}/verify`, {
+            verificationMethod: 'manual',
+            verifiedBy: 'admin'
+        })
+            .then(response => {
+                if (response.success) {
+                    adminPanel.showAlert('Bank account verified successfully', 'success');
+                    adminPanel.loadBankAccounts();
+                } else {
+                    adminPanel.showAlert('Failed to verify bank account: ' + response.message, 'danger');
+                }
+            })
+            .catch(error => {
+                adminPanel.showAlert('Error verifying bank account: ' + error.message, 'danger');
+            });
+    }
+}
+
+function deleteBankAccount(id) {
+    if (confirm('Are you sure you want to delete this bank account?')) {
+        adminPanel.apiCall('DELETE', `/bank-accounts/${id}`)
+            .then(response => {
+                if (response.success) {
+                    adminPanel.showAlert('Bank account deleted successfully', 'success');
+                    adminPanel.loadBankAccounts();
+                } else {
+                    adminPanel.showAlert('Failed to delete bank account: ' + response.message, 'danger');
+                }
+            })
+            .catch(error => {
+                adminPanel.showAlert('Error deleting bank account: ' + error.message, 'danger');
+            });
+    }
 }
