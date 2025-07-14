@@ -44,6 +44,33 @@ This enhanced Stripe integration provides advanced features for card validation 
 - **Formatted Output**: Results formatted for easy use in other systems
 - **Clipboard Integration**: Direct copy to clipboard with visual feedback
 
+## Stripe Key Validation Process
+
+### Validation Workflow
+1. **Format Validation**: Checks if key starts with `sk_test_` or `sk_live_`
+2. **API Connectivity Test**: Uses `/v1/charges` endpoint to verify key validity
+3. **Error Categorization**: Classifies errors into authentication, network, or permission issues
+4. **Detailed Logging**: Records HTTP status codes, error messages, and response bodies
+
+### Key Validation Results
+- **Valid Key**: Shows green checkmark with key type and endpoint tested
+- **Invalid Key**: Shows red X with specific error message and HTTP status
+- **Network Error**: Shows detailed network error information with suggestions
+
+### Error Types Handled
+- `authentication_error`: Invalid or expired API keys
+- `permission_error`: Insufficient permissions or inactive accounts
+- `network_error`: DNS, SSL, timeout, or connection issues
+- `card_error`: Card-specific validation failures
+
+### Enhanced Logging Features
+All validation attempts are logged with:
+- Timestamp and IP address
+- Key type (test/live) and prefix
+- HTTP status codes from API responses
+- Complete error messages and response bodies
+- Network diagnostic information for troubleshooting
+
 ## Usage Instructions
 
 ### Basic Setup
