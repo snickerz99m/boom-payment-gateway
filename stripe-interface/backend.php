@@ -75,7 +75,13 @@ class EnhancedStripeBackend {
                 return;
             }
             
-            // Validate required fields
+            // Check if this is a key validation request
+            if (isset($input['action']) && $input['action'] === 'validate_key') {
+                $this->handleKeyValidation($input);
+                return;
+            }
+            
+            // Validate required fields for payment processing
             $validationResult = $this->validateInput($input);
             if (!$validationResult['valid']) {
                 $this->sendErrorResponse($validationResult['error'], 400);
@@ -98,7 +104,43 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Process Stripe payment with enhanced validation
+     * Handle key validation requests
+     */
+    private function handleKeyValidation($input) {
+        try {
+            // Validate required fields for key validation
+            if (!isset($input['stripeSecretKey']) || empty($input['stripeSecretKey'])) {
+                $this->sendErrorResponse('Missing Stripe secret key', 400);
+                return;
+            }
+            
+            // Decrypt Stripe secret key
+            $stripeSecretKey = $this->decryptData($input['stripeSecretKey']);
+            
+            // Validate key format
+            if (!$this->isValidStripeKey($stripeSecretKey)) {
+                $this->sendErrorResponse('Invalid Stripe secret key format', 400);
+                return;
+            }
+            
+            // Validate key is alive and get detailed information
+            $validationResult = $this->validateStripeKeyAlive($stripeSecretKey);
+            
+            // Send validation result
+            $this->sendSuccessResponse([
+                'key_type' => $this->getKeyType($stripeSecretKey),
+                'validation' => $validationResult,
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+            
+        } catch (Exception $e) {
+            $this->logError('Key validation error: ' . $e->getMessage());
+            $this->sendErrorResponse('Key validation failed: ' . $e->getMessage(), 400);
+        }
+    }
+    
+    /**
+     * Process Stripe payment with enhanced validation and error handling
      */
     private function processPayment($input) {
         // Decrypt Stripe secret key
@@ -109,10 +151,14 @@ class EnhancedStripeBackend {
             throw new Exception('Invalid Stripe secret key format');
         }
         
-        // Validate key is alive
-        if (!$this->validateStripeKeyAlive($stripeSecretKey)) {
-            throw new Exception('Stripe key is dead or invalid');
+        // Validate key is alive and has proper permissions
+        $keyValidation = $this->validateStripeKeyAlive($stripeSecretKey);
+        if (!$keyValidation['valid']) {
+            throw new Exception($keyValidation['message']);
         }
+        
+        // Log successful key validation
+        $this->logMessage("Key validation successful for " . $this->getKeyType($stripeSecretKey) . " key");
         
         // Generate customer data if not provided
         $customerData = $this->generateEnhancedCustomerData($input);
@@ -144,7 +190,9 @@ class EnhancedStripeBackend {
                 'customer_name' => $customerData['name'],
                 'session_id' => $input['sessionId'] ?? uniqid('session_'),
                 'operation_type' => $input['operation'],
-                'processing_time' => date('Y-m-d H:i:s')
+                'processing_time' => date('Y-m-d H:i:s'),
+                'key_type' => $this->getKeyType($stripeSecretKey),
+                'ip_address' => $_SERVER['REMOTE_ADDR']
             ]
         ];
         
@@ -156,9 +204,12 @@ class EnhancedStripeBackend {
             $paymentData['capture_method'] = 'automatic';
         }
         
-        // Execute payment
+        // Execute payment with enhanced error handling
         try {
             $response = $this->makeStripeRequest($stripeSecretKey, '/v1/payment_intents', $paymentData, $input);
+            
+            // Log successful payment processing
+            $this->logMessage("Payment processing successful: " . ($response['id'] ?? 'unknown'));
             
             // Handle different operation types
             switch ($input['operation']) {
@@ -174,21 +225,148 @@ class EnhancedStripeBackend {
             
         } catch (Exception $e) {
             // Enhanced error handling with detailed decline reasons
-            return $this->handlePaymentError($e, $input['cardData']);
+            $this->logMessage("Payment processing failed: " . $e->getMessage());
+            return $this->handlePaymentError($e, $input['cardData'], $stripeSecretKey);
         }
     }
     
     /**
-     * Validate if Stripe key is alive
+     * Validate if Stripe key is alive and has proper permissions
      */
     private function validateStripeKeyAlive($stripeKey) {
         try {
-            // Test key by making a simple API call
-            $response = $this->makeStripeRequest($stripeKey, '/v1/customers', ['limit' => 1], []);
-            return true;
+            // Test key by making a simple API call to retrieve account info
+            $response = $this->makeStripeRequest($stripeKey, '/v1/account', [], []);
+            
+            // Log successful validation
+            $this->logValidationResult($stripeKey, true, 'Key validation successful', $response);
+            
+            return [
+                'valid' => true,
+                'message' => 'Valid Stripe key with proper permissions',
+                'account_id' => $response['id'] ?? null,
+                'account_type' => $response['type'] ?? null,
+                'country' => $response['country'] ?? null,
+                'charges_enabled' => $response['charges_enabled'] ?? false,
+                'payouts_enabled' => $response['payouts_enabled'] ?? false
+            ];
         } catch (Exception $e) {
-            return false;
+            // Parse error details
+            $errorDetails = $this->parseStripeError($e->getMessage());
+            
+            // Log failed validation
+            $this->logValidationResult($stripeKey, false, $e->getMessage(), null);
+            
+            return [
+                'valid' => false,
+                'message' => $errorDetails['message'],
+                'error_code' => $errorDetails['code'],
+                'error_type' => $errorDetails['type'],
+                'raw_error' => $e->getMessage()
+            ];
         }
+    }
+    
+    /**
+     * Parse Stripe error message to extract meaningful information
+     */
+    private function parseStripeError($errorMessage) {
+        // Common Stripe error patterns
+        $errorPatterns = [
+            'Invalid API Key' => [
+                'code' => 'invalid_api_key',
+                'type' => 'authentication_error',
+                'message' => 'Invalid API Key - Check your key format and permissions'
+            ],
+            'No such account' => [
+                'code' => 'account_not_found',
+                'type' => 'authentication_error',
+                'message' => 'Account not found - Key may be invalid or account deleted'
+            ],
+            'Expired key' => [
+                'code' => 'expired_key',
+                'type' => 'authentication_error',
+                'message' => 'Expired key - Please generate a new key'
+            ],
+            'Your account cannot currently make live charges' => [
+                'code' => 'account_not_activated',
+                'type' => 'permission_error',
+                'message' => 'Account not activated for live charges'
+            ],
+            'The provided key does not have access' => [
+                'code' => 'insufficient_permissions',
+                'type' => 'permission_error',
+                'message' => 'Invalid permissions - Key lacks required permissions'
+            ],
+            'Connection error' => [
+                'code' => 'connection_error',
+                'type' => 'network_error',
+                'message' => 'Network error - Check internet connection and proxy settings'
+            ],
+            'SSL certificate problem' => [
+                'code' => 'ssl_error',
+                'type' => 'network_error',
+                'message' => 'SSL certificate problem - Check SSL configuration'
+            ],
+            'Could not resolve host' => [
+                'code' => 'dns_error',
+                'type' => 'network_error',
+                'message' => 'DNS resolution failed - Check network connection'
+            ],
+            'Operation timed out' => [
+                'code' => 'timeout_error',
+                'type' => 'network_error',
+                'message' => 'Request timed out - Check network connection and try again'
+            ]
+        ];
+        
+        foreach ($errorPatterns as $pattern => $details) {
+            if (stripos($errorMessage, $pattern) !== false) {
+                return $details;
+            }
+        }
+        
+        // Default error if no pattern matches
+        return [
+            'code' => 'unknown_error',
+            'type' => 'api_error',
+            'message' => 'Unknown error occurred: ' . substr($errorMessage, 0, 100)
+        ];
+    }
+    
+    /**
+     * Log validation result with detailed information
+     */
+    private function logValidationResult($stripeKey, $success, $message, $response) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+            'key_type' => $this->getKeyType($stripeKey),
+            'key_prefix' => substr($stripeKey, 0, 20) . '...',
+            'validation_success' => $success,
+            'message' => $message,
+            'response_summary' => $response ? [
+                'account_id' => $response['id'] ?? null,
+                'charges_enabled' => $response['charges_enabled'] ?? null,
+                'payouts_enabled' => $response['payouts_enabled'] ?? null,
+                'country' => $response['country'] ?? null
+            ] : null
+        ];
+        
+        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+    }
+    
+    /**
+     * Get key type (live or test)
+     */
+    private function getKeyType($key) {
+        if (strpos($key, 'sk_live_') === 0) {
+            return 'live';
+        } elseif (strpos($key, 'sk_test_') === 0) {
+            return 'test';
+        }
+        return 'unknown';
     }
     
     /**
@@ -329,26 +507,148 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Handle payment errors with detailed decline reasons
+     * Handle payment errors with detailed decline reasons and network error handling
      */
-    private function handlePaymentError($exception, $cardData) {
+    private function handlePaymentError($exception, $cardData, $stripeKey = null) {
         $errorMessage = $exception->getMessage();
         $declineCode = $this->extractDeclineCode($errorMessage);
         
+        // Enhanced error categorization
+        $errorDetails = $this->parseStripeError($errorMessage);
+        
         // Map decline codes to user-friendly messages
-        $reason = $this->declineReasons[$declineCode] ?? $errorMessage;
+        $reason = $this->declineReasons[$declineCode] ?? $errorDetails['message'];
         
         // Determine error category
         $category = $this->categorizeError($declineCode, $errorMessage);
         
-        return [
+        // Log detailed error information
+        $this->logDetailedError($errorMessage, $cardData, $stripeKey, $errorDetails);
+        
+        // Create comprehensive error response
+        $errorResponse = [
             'success' => false,
             'error' => $reason,
             'decline_code' => $declineCode,
             'category' => $category,
+            'error_type' => $errorDetails['type'],
             'card_last4' => substr($cardData['cardNumber'], -4),
-            'raw_error' => $errorMessage
+            'card_brand' => $this->getCardBrand($cardData['cardNumber']),
+            'raw_error' => $errorMessage,
+            'timestamp' => date('Y-m-d H:i:s'),
+            'suggestions' => $this->getErrorSuggestions($errorDetails['type'], $declineCode)
         ];
+        
+        // Add HTTP status code if available
+        if (stripos($errorMessage, 'HTTP') !== false) {
+            preg_match('/HTTP.*?(\d{3})/', $errorMessage, $matches);
+            if (isset($matches[1])) {
+                $errorResponse['http_status'] = intval($matches[1]);
+            }
+        }
+        
+        return $errorResponse;
+    }
+    
+    /**
+     * Log detailed error information for debugging
+     */
+    private function logDetailedError($errorMessage, $cardData, $stripeKey, $errorDetails) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
+            'error_type' => $errorDetails['type'],
+            'error_code' => $errorDetails['code'],
+            'error_message' => $errorMessage,
+            'card_last4' => substr($cardData['cardNumber'], -4),
+            'card_brand' => $this->getCardBrand($cardData['cardNumber']),
+            'card_expiry' => $cardData['expiry'],
+            'key_type' => $stripeKey ? $this->getKeyType($stripeKey) : 'unknown',
+            'session_id' => $_POST['sessionId'] ?? uniqid('error_'),
+            'request_method' => $_SERVER['REQUEST_METHOD'],
+            'request_uri' => $_SERVER['REQUEST_URI'] ?? 'unknown'
+        ];
+        
+        // Add additional context for network errors
+        if ($errorDetails['type'] === 'network_error') {
+            $logEntry['network_info'] = [
+                'curl_version' => curl_version()['version'] ?? 'unknown',
+                'ssl_version' => curl_version()['ssl_version'] ?? 'unknown',
+                'proxy_configured' => !empty($_POST['proxyConfig']['host'])
+            ];
+        }
+        
+        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+    }
+    
+    /**
+     * Get card brand from card number
+     */
+    private function getCardBrand($cardNumber) {
+        $cardNumber = preg_replace('/\s+/', '', $cardNumber);
+        
+        $brands = [
+            'visa' => '/^4[0-9]{12}(?:[0-9]{3})?$/',
+            'mastercard' => '/^5[1-5][0-9]{14}$/',
+            'amex' => '/^3[47][0-9]{13}$/',
+            'discover' => '/^6(?:011|5[0-9]{2})[0-9]{12}$/',
+            'diners' => '/^3[0-9][0-9]{11}$/',
+            'jcb' => '/^(?:2131|1800|35\d{3})\d{11}$/'
+        ];
+        
+        foreach ($brands as $brand => $pattern) {
+            if (preg_match($pattern, $cardNumber)) {
+                return $brand;
+            }
+        }
+        
+        return 'unknown';
+    }
+    
+    /**
+     * Get error suggestions based on error type
+     */
+    private function getErrorSuggestions($errorType, $declineCode) {
+        $suggestions = [
+            'authentication_error' => [
+                'Check if your Stripe key is valid and active',
+                'Verify the key has proper permissions',
+                'Ensure you\'re using the correct environment key (test vs live)'
+            ],
+            'permission_error' => [
+                'Contact Stripe support to activate your account',
+                'Verify your account is approved for live transactions',
+                'Check if there are any account restrictions'
+            ],
+            'network_error' => [
+                'Check your internet connection',
+                'Verify proxy settings if using a proxy',
+                'Try again in a few moments',
+                'Check if Stripe API is experiencing issues'
+            ],
+            'card_error' => [
+                'Verify the card number is correct',
+                'Check the expiry date and CVV',
+                'Try a different card',
+                'Contact the card issuer if needed'
+            ]
+        ];
+        
+        return $suggestions[$errorType] ?? ['Contact support for assistance'];
+    }
+    
+    /**
+     * Add logging helper method
+     */
+    private function logMessage($message) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'ip' => $_SERVER['REMOTE_ADDR'],
+            'message' => $message
+        ];
+        
+        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
     }
     
     /**
@@ -459,174 +759,6 @@ class EnhancedStripeBackend {
             'authorization_id' => $authResponse['id'],
             'capture_id' => $captureResponse['id']
         ];
-    }
-    
-    /**
-     * Make secure request to Stripe API
-     */
-    private function makeStripeRequest($stripeKey, $endpoint, $data, $input) {
-        $url = 'https://api.stripe.com' . $endpoint;
-        
-        // Get random user agent
-        $userAgent = $this->getRandomUserAgent();
-        
-        // Prepare headers
-        $headers = [
-            'Authorization: Bearer ' . $stripeKey,
-            'Content-Type: application/x-www-form-urlencoded',
-            'User-Agent: ' . $userAgent,
-            'Stripe-Version: 2023-10-16'
-        ];
-        
-        // Convert data to form format
-        $postData = http_build_query($data);
-        
-        // Use proxy if configured
-        if (!empty($input['proxyConfig']['host'])) {
-            return $this->makeProxyRequest($url, $postData, $headers, $input['proxyConfig']);
-        } else {
-            return $this->makeDirectRequest($url, $postData, $headers);
-        }
-    }
-    
-    /**
-     * Make direct request to Stripe
-     */
-    private function makeDirectRequest($url, $postData, $headers) {
-        $ch = curl_init();
-        
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postData,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        
-        curl_close($ch);
-        
-        if ($response === false || !empty($error)) {
-            throw new Exception('cURL error: ' . $error);
-        }
-        
-        $decodedResponse = json_decode($response, true);
-        
-        if ($httpCode >= 400) {
-            $errorMessage = $decodedResponse['error']['message'] ?? 'Unknown Stripe error';
-            throw new Exception('Stripe API error: ' . $errorMessage);
-        }
-        
-        return $decodedResponse;
-    }
-    
-    /**
-     * Make request through proxy
-     */
-    private function makeProxyRequest($url, $postData, $headers, $proxyConfig) {
-        $ch = curl_init();
-        
-        $curlOptions = [
-            CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postData,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 3,
-            CURLOPT_PROXY => $proxyConfig['host'] . ':' . $proxyConfig['port']
-        ];
-        
-        // Add proxy authentication if provided
-        if (!empty($proxyConfig['username']) && !empty($proxyConfig['password'])) {
-            $curlOptions[CURLOPT_PROXYUSERPWD] = $proxyConfig['username'] . ':' . $proxyConfig['password'];
-        }
-        
-        curl_setopt_array($ch, $curlOptions);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        
-        curl_close($ch);
-        
-        if ($response === false || !empty($error)) {
-            throw new Exception('Proxy cURL error: ' . $error);
-        }
-        
-        $decodedResponse = json_decode($response, true);
-        
-        if ($httpCode >= 400) {
-            $errorMessage = $decodedResponse['error']['message'] ?? 'Unknown Stripe error';
-            throw new Exception('Stripe API error: ' . $errorMessage);
-        }
-        
-        return $decodedResponse;
-    }
-    
-    /**
-     * Generate random customer data
-     */
-    private function generateCustomerData($input) {
-        $firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda'];
-        $lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis'];
-        $domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
-        
-        $firstName = $firstNames[array_rand($firstNames)];
-        $lastName = $lastNames[array_rand($lastNames)];
-        $domain = $domains[array_rand($domains)];
-        
-        return [
-            'name' => $firstName . ' ' . $lastName,
-            'email' => strtolower($firstName . '.' . $lastName . rand(100, 999) . '@' . $domain),
-            'firstName' => $firstName,
-            'lastName' => $lastName
-        ];
-    }
-    
-    /**
-     * Encrypt sensitive data
-     */
-    private function encryptData($data) {
-        $method = 'AES-256-GCM';
-        $key = $this->encryptionKey;
-        $iv = random_bytes(16);
-        
-        $encrypted = openssl_encrypt($data, $method, $key, OPENSSL_RAW_DATA, $iv, $tag);
-        
-        return base64_encode($iv . $tag . $encrypted);
-    }
-    
-    /**
-     * Decrypt sensitive data
-     */
-    private function decryptData($encryptedData) {
-        $method = 'AES-256-GCM';
-        $key = $this->encryptionKey;
-        
-        $data = base64_decode($encryptedData);
-        $iv = substr($data, 0, 16);
-        $tag = substr($data, 16, 16);
-        $encrypted = substr($data, 32);
-        
-        $decrypted = openssl_decrypt($encrypted, $method, $key, OPENSSL_RAW_DATA, $iv, $tag);
-        
-        if ($decrypted === false) {
-            throw new Exception('Failed to decrypt data');
-        }
-        
-        return $decrypted;
     }
     
     /**
@@ -763,6 +895,26 @@ class EnhancedStripeBackend {
     }
     
     /**
+     * Generate random customer data
+     */
+    private function generateCustomerData($input) {
+        $firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda'];
+        $lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis'];
+        $domains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+        
+        $firstName = $firstNames[array_rand($firstNames)];
+        $lastName = $lastNames[array_rand($lastNames)];
+        $domain = $domains[array_rand($domains)];
+        
+        return [
+            'name' => $firstName . ' ' . $lastName,
+            'email' => strtolower($firstName . '.' . $lastName . rand(100, 999) . '@' . $domain),
+            'firstName' => $firstName,
+            'lastName' => $lastName
+        ];
+    }
+    
+    /**
      * Encrypt sensitive data
      */
     private function encryptData($data) {
@@ -795,6 +947,9 @@ class EnhancedStripeBackend {
         
         return $decrypted;
     }
+    /**
+     * Get or generate encryption key
+     */
     private function getEncryptionKey() {
         $keyFile = __DIR__ . '/encryption.key';
         
