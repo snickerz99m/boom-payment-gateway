@@ -22,9 +22,13 @@ const Customer = require('../models/Customer');
 const PaymentMethod = require('../models/PaymentMethod');
 const Transaction = require('../models/Transaction');
 
+// Import payment processors
+const StripeService = require('./stripe.service');
+const PayPalService = require('./paypal.service');
+
 /**
  * Payment Service
- * Handles payment processing with CVV and non-CVV support
+ * Handles payment processing with real payment processors
  */
 class PaymentService {
   constructor() {
@@ -32,6 +36,11 @@ class PaymentService {
     this.processingFeeFixed = 30; // $0.30 in cents
     this.maxAmount = 99999999; // $999,999.99 in cents
     this.minAmount = 1; // $0.01 in cents
+    this.preferredProcessor = process.env.PREFERRED_PAYMENT_PROCESSOR || 'stripe';
+    
+    // Initialize payment processors
+    this.stripeService = new StripeService();
+    this.paypalService = new PayPalService();
   }
 
   /**
@@ -423,72 +432,219 @@ class PaymentService {
    * @param {object} riskAssessment - Risk assessment
    * @returns {object} - Processing result
    */
+  /**
+   * Process payment with real payment gateway
+   * @param {object} transaction - Transaction object
+   * @param {object} paymentMethod - Payment method object
+   * @param {object} paymentData - Payment data
+   * @param {object} riskAssessment - Risk assessment result
+   * @returns {object} - Processing result
+   */
   async processPaymentWithGateway(transaction, paymentMethod, paymentData, riskAssessment) {
+    const startTime = Date.now();
+    
+    try {
+      // Prepare payment data for gateway
+      const gatewayPaymentData = {
+        amount: transaction.amount,
+        currency: transaction.currency,
+        description: transaction.description,
+        cardData: paymentData.cardData || this.getCardDataFromToken(paymentMethod),
+        customerData: {
+          email: paymentData.customerInfo?.email || 'guest@example.com',
+          firstName: paymentData.customerInfo?.firstName || 'Guest',
+          lastName: paymentData.customerInfo?.lastName || 'Customer'
+        }
+      };
+
+      // Determine CVV result
+      let cvvResult = CVV_VALIDATION.NOT_PROVIDED;
+      if (gatewayPaymentData.cardData.cvv) {
+        cvvResult = CVV_VALIDATION.MATCH; // Will be validated by gateway
+      }
+
+      // Choose payment processor based on configuration or card type
+      const processor = this.selectPaymentProcessor(paymentData, riskAssessment);
+      
+      let processingResult;
+      
+      // Check if we're in test mode and should use simulation
+      if (process.env.PAYMENT_MODE === 'test' || process.env.NODE_ENV === 'development') {
+        processingResult = await this.simulatePaymentProcessing(gatewayPaymentData, riskAssessment);
+      } else {
+        // Process with real payment gateway
+        switch (processor) {
+          case 'stripe':
+            processingResult = await this.stripeService.processPayment(gatewayPaymentData);
+            break;
+          case 'paypal':
+            processingResult = await this.paypalService.processPayment(gatewayPaymentData);
+            break;
+          default:
+            throw new Error(`Unsupported payment processor: ${processor}`);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+
+      // Map gateway response to internal format
+      const result = {
+        success: processingResult.success,
+        status: processingResult.status || (processingResult.success ? TRANSACTION_STATUS.COMPLETED : TRANSACTION_STATUS.FAILED),
+        responseCode: processingResult.gatewayResponse?.responseCode || (processingResult.success ? RESPONSE_CODES.SUCCESS : RESPONSE_CODES.DECLINED),
+        responseMessage: processingResult.gatewayResponse?.responseMessage || (processingResult.success ? 'Payment processed successfully' : 'Payment failed'),
+        gatewayTransactionId: processingResult.transactionId,
+        processingTime,
+        cvvResult,
+        paymentMethod: processingResult.paymentMethod || {
+          cardType: paymentMethod.cardType,
+          cardBrand: paymentMethod.cardBrand,
+          cardLast4: paymentMethod.cardLast4,
+          expiryDate: `${paymentMethod.expiryMonth}/${paymentMethod.expiryYear}`
+        }
+      };
+
+      logger.info(`Payment processing completed in ${processingTime}ms with ${processor}`, {
+        transactionId: transaction.transactionId,
+        success: result.success,
+        processor
+      });
+
+      return result;
+
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error('Payment processing failed:', error);
+      
+      return {
+        success: false,
+        status: TRANSACTION_STATUS.FAILED,
+        responseCode: RESPONSE_CODES.PROCESSING_ERROR,
+        responseMessage: 'Payment processing failed',
+        gatewayTransactionId: null,
+        processingTime,
+        cvvResult: CVV_VALIDATION.NOT_PROVIDED,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Select payment processor based on configuration and data
+   * @param {object} paymentData - Payment data
+   * @param {object} riskAssessment - Risk assessment
+   * @returns {string} - Processor name
+   */
+  selectPaymentProcessor(paymentData, riskAssessment) {
+    // Force specific processor if requested
+    if (paymentData.preferredProcessor) {
+      return paymentData.preferredProcessor;
+    }
+
+    // Use configuration default
+    return this.preferredProcessor;
+  }
+
+  /**
+   * Get card data from encrypted token
+   * @param {object} paymentMethod - Payment method object
+   * @returns {object} - Card data
+   */
+  getCardDataFromToken(paymentMethod) {
+    try {
+      const decryptedData = decryptCardToken(paymentMethod.encryptedCardData);
+      return {
+        cardNumber: decryptedData.cardNumber,
+        expiryDate: decryptedData.expiryDate,
+        cardholderName: paymentMethod.cardholderName,
+        cvv: null // CVV is never stored, must be provided fresh
+      };
+    } catch (error) {
+      throw new Error('Failed to decrypt card data');
+    }
+  }
+
+  /**
+   * Simulate payment processing for testing
+   * @param {object} gatewayPaymentData - Gateway payment data
+   * @param {object} riskAssessment - Risk assessment
+   * @returns {object} - Processing result
+   */
+  async simulatePaymentProcessing(gatewayPaymentData, riskAssessment) {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
 
-    // Get card data for processing
-    let cardNumber;
-    let cvv;
-
-    if (paymentData.cardData) {
-      cardNumber = paymentData.cardData.cardNumber;
-      cvv = paymentData.cardData.cvv;
-    } else {
-      // Decrypt card data from token
-      const decryptedData = decryptCardToken(paymentMethod.encryptedCardData);
-      cardNumber = decryptedData.cardNumber;
-      cvv = paymentData.cvv; // CVV is not stored, must be provided fresh
-    }
-
-    // Determine CVV result
-    let cvvResult = CVV_VALIDATION.NOT_PROVIDED;
-    if (cvv) {
-      // Simulate CVV validation
-      if (Math.random() > 0.05) { // 95% success rate
-        cvvResult = CVV_VALIDATION.MATCH;
-      } else {
-        cvvResult = CVV_VALIDATION.NO_MATCH;
-      }
-    }
+    const { cardData } = gatewayPaymentData;
+    const cardNumber = cardData.cardNumber;
 
     // Check if it's a test card
     const isTestCard = Object.values(TEST_CARDS).includes(cardNumber);
 
-    // Simulate payment processing logic
-    let status = TRANSACTION_STATUS.COMPLETED;
-    let responseCode = RESPONSE_CODES.SUCCESS;
-    let responseMessage = 'Payment processed successfully';
-
     // Simulate various failure scenarios
     if (isTestCard && cardNumber === TEST_CARDS.VISA_DECLINED) {
-      status = TRANSACTION_STATUS.FAILED;
-      responseCode = RESPONSE_CODES.DECLINED;
-      responseMessage = 'Card declined';
-    } else if (cvvResult === CVV_VALIDATION.NO_MATCH) {
-      status = TRANSACTION_STATUS.FAILED;
-      responseCode = RESPONSE_CODES.INVALID_CVV;
-      responseMessage = 'Invalid CVV';
-    } else if (riskAssessment.level === 'very_high') {
-      // High risk transactions have higher failure rate
+      return {
+        success: false,
+        status: TRANSACTION_STATUS.FAILED,
+        gatewayResponse: {
+          responseCode: RESPONSE_CODES.DECLINED,
+          responseMessage: 'Card declined'
+        }
+      };
+    }
+
+    if (riskAssessment.level === 'very_high') {
       if (Math.random() > 0.7) { // 30% success rate for very high risk
-        status = TRANSACTION_STATUS.FAILED;
-        responseCode = RESPONSE_CODES.FRAUD_SUSPECTED;
-        responseMessage = 'Transaction flagged for fraud review';
+        return {
+          success: false,
+          status: TRANSACTION_STATUS.FAILED,
+          gatewayResponse: {
+            responseCode: RESPONSE_CODES.FRAUD_SUSPECTED,
+            responseMessage: 'Transaction flagged for fraud review'
+          }
+        };
       }
     } else if (riskAssessment.level === 'high') {
-      // High risk transactions have moderate failure rate
       if (Math.random() > 0.85) { // 15% failure rate for high risk
-        status = TRANSACTION_STATUS.FAILED;
-        responseCode = RESPONSE_CODES.DECLINED;
-        responseMessage = 'Card declined';
+        return {
+          success: false,
+          status: TRANSACTION_STATUS.FAILED,
+          gatewayResponse: {
+            responseCode: RESPONSE_CODES.DECLINED,
+            responseMessage: 'Card declined'
+          }
+        };
       }
     } else {
-      // Low/medium risk transactions have low failure rate
       if (Math.random() > 0.95) { // 5% failure rate for low/medium risk
-        status = TRANSACTION_STATUS.FAILED;
-        responseCode = RESPONSE_CODES.PROCESSING_ERROR;
-        responseMessage = 'Processing error occurred';
+        return {
+          success: false,
+          status: TRANSACTION_STATUS.FAILED,
+          gatewayResponse: {
+            responseCode: RESPONSE_CODES.PROCESSING_ERROR,
+            responseMessage: 'Processing error occurred'
+          }
+        };
+      }
+    }
+
+    // Simulate successful payment
+    return {
+      success: true,
+      status: TRANSACTION_STATUS.COMPLETED,
+      transactionId: `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      gatewayResponse: {
+        responseCode: RESPONSE_CODES.SUCCESS,
+        responseMessage: 'Payment processed successfully',
+        gatewayTransactionId: `gw_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      },
+      paymentMethod: {
+        brand: detectCardType(cardNumber),
+        last4: cardNumber.slice(-4),
+        expMonth: parseInt(cardData.expiryDate.split('/')[0]),
+        expYear: parseInt(cardData.expiryDate.split('/')[1])
+      }
+    };
+  }
       }
     }
 

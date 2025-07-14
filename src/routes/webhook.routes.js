@@ -2,8 +2,55 @@ const express = require('express');
 const crypto = require('crypto');
 const { logger } = require('../utils/logger');
 const { notificationService } = require('../services/notification.service');
+const StripeService = require('../services/stripe.service');
+const PayPalService = require('../services/paypal.service');
 
 const router = express.Router();
+
+// Initialize payment services
+const stripeService = new StripeService();
+const paypalService = new PayPalService();
+
+// Stripe webhook endpoint
+router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const signature = req.headers['stripe-signature'];
+    
+    if (!signature) {
+      return res.status(401).json({
+        success: false,
+        message: 'Missing Stripe signature'
+      });
+    }
+
+    const result = await stripeService.handleWebhook(req.body, signature);
+    
+    if (result.success) {
+      res.json({ received: true });
+    } else {
+      res.status(400).json({ error: result.error });
+    }
+  } catch (error) {
+    logger.error('Stripe webhook error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// PayPal webhook endpoint
+router.post('/paypal', express.json(), async (req, res) => {
+  try {
+    const result = await paypalService.handleWebhook(req.body, req.headers);
+    
+    if (result.success) {
+      res.json({ received: true });
+    } else {
+      res.status(400).json({ error: result.error });
+    }
+  } catch (error) {
+    logger.error('PayPal webhook error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // Webhook signature verification middleware
 const verifyWebhookSignature = (req, res, next) => {
