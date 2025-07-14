@@ -10,6 +10,9 @@ yarn-error.log*
 .env.production
 .env.development
 
+# Security keys backup
+keys-backup.json
+
 # Logs
 logs/
 *.log

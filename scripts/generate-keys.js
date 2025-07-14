@@ -17,7 +17,7 @@ const generateJwtSecret = () => {
 
 // Generate encryption key
 const generateEncryptionKey = () => {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(16).toString('hex'); // 32 character hex string from 16 bytes
 };
 
 // Generate webhook secret

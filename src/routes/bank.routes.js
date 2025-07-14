@@ -34,10 +34,10 @@ router.post('/', [
 
     // Create bank account
     const bankAccount = await BankAccount.create({
-      customer_id: req.body.customer_id,
-      account_name: req.body.account_name,
-      bank_name: req.body.bank_name,
-      account_type: req.body.account_type || 'checking',
+      customerId: req.body.customer_id,
+      accountName: req.body.account_name,
+      bankName: req.body.bank_name,
+      accountType: req.body.account_type || 'checking',
       status: 'pending_verification'
     });
 
@@ -55,13 +55,13 @@ router.post('/', [
       success: true,
       bank_account: {
         id: bankAccount.id,
-        customer_id: bankAccount.customer_id,
-        account_name: bankAccount.account_name,
-        bank_name: bankAccount.bank_name,
-        account_type: bankAccount.account_type,
+        customer_id: bankAccount.customerId,
+        account_name: bankAccount.accountName,
+        bank_name: bankAccount.bankName,
+        account_type: bankAccount.accountType,
         status: bankAccount.status,
         masked_account_number: bankAccount.getMaskedAccountNumber(),
-        created_at: bankAccount.created_at
+        created_at: bankAccount.createdAt
       }
     });
   } catch (error) {
@@ -75,7 +75,7 @@ router.post('/', [
 });
 
 // Get bank account details
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware.authenticate(), async (req, res) => {
   try {
     const bankAccount = await BankAccount.findByPk(req.params.id, {
       include: [{
@@ -120,7 +120,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // Verify bank account
 router.post('/:id/verify', [
-  authMiddleware,
+  authMiddleware.authenticate(),
   body('verification_method').isIn(['micro_deposits', 'instant', 'plaid']).withMessage('Invalid verification method'),
   body('verification_data').isObject().withMessage('Verification data is required')
 ], async (req, res) => {
@@ -176,7 +176,7 @@ router.post('/:id/verify', [
 });
 
 // List customer's bank accounts
-router.get('/customer/:customer_id', authMiddleware, async (req, res) => {
+router.get('/customer/:customer_id', authMiddleware.authenticate(), async (req, res) => {
   try {
     const bankAccounts = await BankAccount.findAll({
       where: { customer_id: req.params.customer_id },
@@ -209,7 +209,7 @@ router.get('/customer/:customer_id', authMiddleware, async (req, res) => {
 });
 
 // Delete bank account
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware.authenticate(), async (req, res) => {
   try {
     const bankAccount = await BankAccount.findByPk(req.params.id);
     

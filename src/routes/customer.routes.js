@@ -20,7 +20,20 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const customer = await Customer.create(req.body);
+    // Generate customer ID
+    const customerId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+    // Map snake_case to camelCase for model
+    const customerData = {
+      customerId: customerId,
+      firstName: req.body.first_name,
+      lastName: req.body.last_name,
+      email: req.body.email,
+      phone: req.body.phone,
+      address: req.body.address
+    };
+
+    const customer = await Customer.create(customerData);
     
     logger.info(`Customer created successfully: ${customer.id}`);
     
@@ -28,8 +41,9 @@ router.post('/', [
       success: true,
       customer: {
         id: customer.id,
-        first_name: customer.first_name,
-        last_name: customer.last_name,
+        customer_id: customer.customerId,
+        first_name: customer.firstName,
+        last_name: customer.lastName,
         email: customer.email,
         phone: customer.phone,
         address: customer.address,
@@ -47,7 +61,7 @@ router.post('/', [
 });
 
 // Get customer details
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware.authenticate(), async (req, res) => {
   try {
     const customer = await Customer.findByPk(req.params.id, {
       include: ['paymentMethods', 'transactions']
@@ -76,7 +90,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // Update customer
 router.put('/:id', [
-  authMiddleware,
+  authMiddleware.authenticate(),
   body('first_name').optional().isString().withMessage('First name must be a string'),
   body('last_name').optional().isString().withMessage('Last name must be a string'),
   body('email').optional().isEmail().withMessage('Valid email is required'),

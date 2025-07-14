@@ -47,7 +47,7 @@ router.post('/', [
 });
 
 // Get payment details
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware.authenticate(), async (req, res) => {
   try {
     const payment = await paymentService.getPayment(req.params.id);
     
@@ -74,7 +74,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // Refund payment
 router.post('/:id/refund', [
-  authMiddleware,
+  authMiddleware.authenticate(),
   body('amount').optional().isFloat({ min: 0.01 }).withMessage('Refund amount must be at least 0.01'),
   body('reason').optional().isString().withMessage('Reason must be a string')
 ], async (req, res) => {

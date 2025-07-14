@@ -8,7 +8,7 @@ const BankAccount = sequelize.define('BankAccount', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  customer_id: {
+  customerId: {
     type: DataTypes.UUID,
     allowNull: false,
     references: {
@@ -16,23 +16,23 @@ const BankAccount = sequelize.define('BankAccount', {
       key: 'id'
     }
   },
-  account_name: {
+  accountName: {
     type: DataTypes.STRING,
     allowNull: false
   },
-  bank_name: {
+  bankName: {
     type: DataTypes.STRING,
     allowNull: false
   },
-  account_number_encrypted: {
+  accountNumberEncrypted: {
     type: DataTypes.TEXT,
-    allowNull: false
+    allowNull: true
   },
-  routing_number_encrypted: {
+  routingNumberEncrypted: {
     type: DataTypes.TEXT,
-    allowNull: false
+    allowNull: true
   },
-  account_type: {
+  accountType: {
     type: DataTypes.STRING,
     allowNull: false,
     defaultValue: 'checking',
@@ -48,42 +48,42 @@ const BankAccount = sequelize.define('BankAccount', {
       isIn: [['active', 'inactive', 'pending_verification', 'verified']]
     }
   },
-  verification_method: {
+  verificationMethod: {
     type: DataTypes.STRING,
     allowNull: true,
     validate: {
       isIn: [['micro_deposits', 'instant', 'plaid']]
     }
   },
-  verification_data: {
+  verificationData: {
     type: DataTypes.TEXT,
     allowNull: true,
     get() {
-      const rawValue = this.getDataValue('verification_data');
+      const rawValue = this.getDataValue('verificationData');
       return rawValue ? JSON.parse(rawValue) : null;
     },
     set(value) {
-      this.setDataValue('verification_data', value ? JSON.stringify(value) : null);
+      this.setDataValue('verificationData', value ? JSON.stringify(value) : null);
     }
   },
-  plaid_access_token: {
+  plaidAccessToken: {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  plaid_account_id: {
+  plaidAccountId: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  last_used_at: {
+  lastUsedAt: {
     type: DataTypes.DATE,
     allowNull: true
   },
-  created_at: {
+  createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
   },
-  updated_at: {
+  updatedAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW
@@ -91,25 +91,26 @@ const BankAccount = sequelize.define('BankAccount', {
 }, {
   tableName: 'bank_accounts',
   timestamps: true,
+  underscored: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at'
 });
 
 // Virtual fields for account number and routing number
 BankAccount.prototype.setAccountNumber = function(accountNumber) {
-  this.account_number_encrypted = encrypt(accountNumber);
+  this.accountNumberEncrypted = encrypt(accountNumber);
 };
 
 BankAccount.prototype.getAccountNumber = function() {
-  return decrypt(this.account_number_encrypted);
+  return decrypt(this.accountNumberEncrypted);
 };
 
 BankAccount.prototype.setRoutingNumber = function(routingNumber) {
-  this.routing_number_encrypted = encrypt(routingNumber);
+  this.routingNumberEncrypted = encrypt(routingNumber);
 };
 
 BankAccount.prototype.getRoutingNumber = function() {
-  return decrypt(this.routing_number_encrypted);
+  return decrypt(this.routingNumberEncrypted);
 };
 
 // Get masked account number for display
