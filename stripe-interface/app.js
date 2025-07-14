@@ -1,7 +1,7 @@
 // Enhanced Stripe Payment Gateway - Bulk Card Processing Implementation
 // Features: Bulk card processing, detailed status reporting, auto-generation
 
-class EnhancedStripeGateway {
+class StripePaymentGateway {
     constructor() {
         this.userAgents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -456,49 +456,72 @@ class EnhancedStripeGateway {
         const lines = bulkCards.split('\n').filter(line => line.trim());
         this.logMessage(`📊 Processing ${lines.length} cards...`);
         
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            const parts = line.split('|');
-            
-            if (parts.length !== 4) {
-                this.logMessage(`⚠️ Skipping invalid format: ${line}`);
-                continue;
-            }
-            
-            const [cardNumber, month, year, cvv] = parts;
-            
-            // Normalize year format
-            const normalizedYear = year.length === 2 ? year : year.slice(-2);
-            
-            const cardData = {
-                cardNumber: cardNumber.replace(/\s+/g, ''),
-                expiry: `${month}/${normalizedYear}`,
-                cvv: cvv,
-                holderName: formData.cardholderName || this.generateRandomName()
-            };
-            
-            this.logMessage(`🔄 Processing card ${i + 1}/${lines.length}: ${this.maskCardNumber(cardData.cardNumber)}`);
-            
-            try {
-                await this.processCard(cardData, formData);
+        const delayTime = parseFloat(formData.delayTime) || 0.5;
+        const threadCount = parseInt(formData.threadCount) || 3;
+        
+        this.logMessage(`⚙️ Using ${threadCount} threads with ${delayTime}s delay`);
+        
+        // Process cards in batches based on thread count
+        const batches = [];
+        for (let i = 0; i < lines.length; i += threadCount) {
+            batches.push(lines.slice(i, i + threadCount));
+        }
+        
+        let processedCount = 0;
+        
+        for (const batch of batches) {
+            const batchPromises = batch.map(async (line, index) => {
+                const parts = line.trim().split('|');
                 
-                // Add small delay between requests to avoid rate limiting
-                if (i < lines.length - 1) {
-                    await this.sleep(500);
+                if (parts.length !== 4) {
+                    this.logMessage(`⚠️ Skipping invalid format: ${line}`);
+                    return;
                 }
                 
-            } catch (error) {
-                this.logMessage(`❌ Error processing card ${i + 1}: ${error.message}`);
-                this.results.declined.push({
-                    cardNumber: cardData.cardNumber,
-                    expiry: cardData.expiry,
-                    cvv: cardData.cvv,
-                    status: 'ERROR',
-                    reason: error.message
-                });
-            }
+                const [cardNumber, month, year, cvv] = parts;
+                
+                // Normalize year format
+                const normalizedYear = year.length === 2 ? year : year.slice(-2);
+                
+                const cardData = {
+                    cardNumber: cardNumber.replace(/\s+/g, ''),
+                    expiry: `${month}/${normalizedYear}`,
+                    cvv: cvv,
+                    holderName: formData.cardholderName || this.generateRandomName()
+                };
+                
+                this.logMessage(`🔄 Processing card ${processedCount + index + 1}/${lines.length}: ${this.maskCardNumber(cardData.cardNumber)}`);
+                
+                try {
+                    await this.processCard(cardData, formData);
+                    
+                    // Add delay between requests within the same thread
+                    if (delayTime > 0) {
+                        await this.sleep(delayTime * 1000);
+                    }
+                    
+                } catch (error) {
+                    this.logMessage(`❌ Error processing card ${processedCount + index + 1}: ${error.message}`);
+                    this.results.declined.push({
+                        cardNumber: cardData.cardNumber,
+                        expiry: cardData.expiry,
+                        cvv: cardData.cvv,
+                        status: 'ERROR',
+                        reason: error.message
+                    });
+                }
+                
+                this.updateResultBoxes();
+            });
             
-            this.updateResultBoxes();
+            // Wait for all cards in this batch to complete
+            await Promise.all(batchPromises);
+            processedCount += batch.length;
+            
+            // Add delay between batches
+            if (delayTime > 0 && processedCount < lines.length) {
+                await this.sleep(delayTime * 1000);
+            }
         }
     }
     
@@ -672,7 +695,7 @@ class EnhancedStripeGateway {
 
 // Initialize the enhanced payment gateway when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new EnhancedStripeGateway();
+    new StripePaymentGateway();
 });
 
 // Security: Clear sensitive data on page unload

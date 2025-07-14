@@ -4,7 +4,7 @@
  * Features: Bulk card processing, detailed decline reasons, automatic customer data generation
  */
 
-class EnhancedStripeBackend {
+class StripePaymentBackend {
     
     private $encryptionKey;
     private $rateLimitFile;
@@ -998,7 +998,7 @@ class EnhancedStripeBackend {
 // Handle the request
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $backend = new EnhancedStripeBackend();
+        $backend = new StripePaymentBackend();
         $backend->handleRequest();
     } else {
         http_response_code(405);

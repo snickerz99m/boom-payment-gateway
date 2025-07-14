@@ -1,4 +1,4 @@
-# Enhanced Stripe Integration Documentation
+# Stripe Payment Gateway - Enhanced Integration Documentation
 
 ## Overview
 
@@ -12,30 +12,36 @@ This enhanced Stripe integration provides advanced features for card validation 
 - **Automatic Validation**: Real-time format validation with status feedback
 - **Rate Limiting**: Built-in delays between requests to prevent API rate limiting
 
-### 2. Real-time Stripe Key Validation
+### 2. Delay and Threading Options
+- **Configurable Delays**: Set delay time between processing requests (0-10 seconds)
+- **Multi-threading Support**: Configure number of parallel processing threads (1-10)
+- **Batch Processing**: Automatically processes cards in batches based on thread count
+- **Rate Limiting Protection**: Built-in delays prevent API rate limiting
+
+### 3. Real-time Stripe Key Validation
 - **Format Validation**: Automatically validates `sk_live_` and `sk_test_` key formats
 - **Live Status Check**: Verifies if the provided key is active and functional
 - **Visual Feedback**: Clear success/error indicators with descriptive messages
 
-### 3. Separate Result Categorization
+### 4. Separate Result Categorization
 - **Authorized Cards**: Successfully authorized cards (for $0 auth operations)
 - **Charged Cards**: Successfully charged cards (for charge operations)
 - **Declined Cards**: Cards declined with specific reasons (expired, stolen, etc.)
 - **CVV Issues**: Cards with CVV verification problems (CCN cards)
 - **Valid Cards**: Cards that are valid and ready for charging
 
-### 4. Enhanced Error Handling
+### 5. Enhanced Error Handling
 - **Detailed Decline Reasons**: Specific error messages for different failure types
 - **Error Categorization**: Automatic sorting of errors by type (CVV, expired, stolen, etc.)
 - **User-friendly Messages**: Clear, actionable error descriptions
 
-### 5. Automatic Data Generation
+### 6. Automatic Data Generation
 - **Email Generation**: Realistic email addresses with various domain providers
 - **Name Generation**: Diverse first and last name combinations
 - **User Agent Rotation**: Multiple browser user agents for security
 - **Customer Data**: Complete customer profiles for each transaction
 
-### 6. Copy Functionality
+### 7. Copy Functionality
 - **Quick Copy**: One-click copy buttons for each result category
 - **Formatted Output**: Results formatted for easy use in other systems
 - **Clipboard Integration**: Direct copy to clipboard with visual feedback
@@ -74,7 +80,13 @@ Format your cards as follows:
 6011111111111117|05|24|789
 ```
 
-#### 4. Single Card Processing
+#### 4. Delay and Threading Configuration
+- **Delay Between Requests**: Set time delay between processing each card (0-10 seconds)
+- **Number of Threads**: Configure parallel processing threads (1-10)
+- **Batch Processing**: Cards are automatically processed in batches based on thread count
+- **Rate Limiting**: Built-in protection against API rate limiting
+
+#### 5. Single Card Processing
 If no bulk cards are provided, the system will use the single card fields:
 - Card Number
 - Expiry (MM/YY)

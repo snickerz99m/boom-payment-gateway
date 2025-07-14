@@ -50,8 +50,8 @@ describe('Enhanced Stripe Interface Tests', () => {
   });
   
   describe('JavaScript Enhanced Functionality', () => {
-    test('should contain EnhancedStripeGateway class', () => {
-      expect(jsContent).toContain('class EnhancedStripeGateway');
+    test('should contain StripePaymentGateway class', () => {
+      expect(jsContent).toContain('class StripePaymentGateway');
     });
     
     test('should contain bulk card processing functions', () => {
@@ -86,8 +86,8 @@ describe('Enhanced Stripe Interface Tests', () => {
   });
   
   describe('Backend PHP Enhanced Features', () => {
-    test('should contain EnhancedStripeBackend class', () => {
-      expect(phpContent).toContain('class EnhancedStripeBackend');
+    test('should contain StripePaymentBackend class', () => {
+      expect(phpContent).toContain('class StripePaymentBackend');
     });
     
     test('should contain decline reason handling', () => {
