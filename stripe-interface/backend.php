@@ -98,8 +98,21 @@ class EnhancedStripeBackend {
             $this->sendSuccessResponse($result);
             
         } catch (Exception $e) {
-            $this->logError($e->getMessage());
-            $this->sendErrorResponse('Internal server error', 500);
+            $this->logError('Payment processing exception: ' . $e->getMessage());
+            
+            // Provide more detailed error information
+            $errorDetails = [
+                'error_message' => $e->getMessage(),
+                'operation' => $input['operation'] ?? 'unknown',
+                'amount' => $input['amount'] ?? 'unknown',
+                'currency' => $input['currency'] ?? 'unknown',
+                'trace' => $e->getTraceAsString()
+            ];
+            
+            // Log detailed error for debugging
+            $this->logMessage('Detailed error: ' . json_encode($errorDetails));
+            
+            $this->sendErrorResponse('Internal server error: ' . $e->getMessage(), 500);
         }
     }
     
@@ -180,8 +193,8 @@ class EnhancedStripeBackend {
             usleep($delayConfig['delay'] * 1000); // Convert ms to microseconds
         }
         
-        // Decrypt Stripe secret key
-        $stripeSecretKey = $this->decryptData($input['stripeSecretKey']);
+        // Decrypt or decode Stripe secret key
+        $stripeSecretKey = $this->processStripeKey($input['stripeSecretKey']);
         
         // Validate Stripe key format
         if (!$this->isValidStripeKey($stripeSecretKey)) {
@@ -238,7 +251,7 @@ class EnhancedStripeBackend {
         // Set capture based on operation type
         if ($input['operation'] === 'auth') {
             $paymentData['capture_method'] = 'manual';
-            $paymentData['amount'] = 0; // $0 authorization
+            // Keep the original amount for auth operations, don't set to 0
         } else {
             $paymentData['capture_method'] = 'automatic';
         }
@@ -629,12 +642,16 @@ class EnhancedStripeBackend {
      * Handle auth and capture response
      */
     private function handleAuthCaptureResponse($response, $paymentData, $stripeKey, $input) {
-        // First authorize
+        // First check the authorization response
         $authResponse = $response;
         
-        // Then capture if authorization successful
+        // Log the authorization response for debugging
+        $this->logMessage("Auth response status: " . $authResponse['status']);
+        
+        // Check if authorization was successful and requires capture
         if ($authResponse['status'] === 'requires_capture') {
             try {
+                // Capture the authorized amount
                 $captureData = ['amount_to_capture' => $paymentData['amount']];
                 $captureResponse = $this->makeStripeRequest(
                     $stripeKey, 
@@ -643,6 +660,8 @@ class EnhancedStripeBackend {
                     $input,
                     'POST'
                 );
+                
+                $this->logMessage("Capture successful: " . $captureResponse['id']);
                 
                 return [
                     'success' => true,
@@ -657,17 +676,53 @@ class EnhancedStripeBackend {
                 ];
                 
             } catch (Exception $e) {
+                $this->logError("Capture failed: " . $e->getMessage());
                 return [
                     'success' => false,
                     'operation' => 'auth_capture',
                     'error' => 'Authorization succeeded but capture failed: ' . $e->getMessage(),
-                    'authorization_id' => $authResponse['id']
+                    'authorization_id' => $authResponse['id'],
+                    'authorization_status' => $authResponse['status']
                 ];
             }
+        } elseif ($authResponse['status'] === 'succeeded') {
+            // Payment was already captured (automatic capture)
+            $this->logMessage("Payment already captured automatically");
+            return [
+                'success' => true,
+                'operation' => 'auth_capture',
+                'transactionId' => $authResponse['id'],
+                'status' => $authResponse['status'],
+                'amount' => $paymentData['amount'] / 100,
+                'currency' => strtoupper($paymentData['currency']),
+                'authorization_id' => $authResponse['id'],
+                'captured' => true,
+                'note' => 'Payment was captured automatically'
+            ];
+        } elseif ($authResponse['status'] === 'requires_action') {
+            // Payment requires additional action (3D Secure, etc.)
+            $this->logMessage("Payment requires additional action");
+            return [
+                'success' => false,
+                'operation' => 'auth_capture',
+                'error' => 'Payment requires additional action (3D Secure authentication)',
+                'authorization_id' => $authResponse['id'],
+                'authorization_status' => $authResponse['status'],
+                'client_secret' => $authResponse['client_secret'] ?? null,
+                'next_action' => $authResponse['next_action'] ?? null
+            ];
+        } else {
+            // Authorization failed or has unexpected status
+            $this->logMessage("Authorization failed or unexpected status: " . $authResponse['status']);
+            return [
+                'success' => false,
+                'operation' => 'auth_capture',
+                'error' => 'Authorization failed with status: ' . $authResponse['status'],
+                'authorization_id' => $authResponse['id'],
+                'authorization_status' => $authResponse['status'],
+                'last_payment_error' => $authResponse['last_payment_error'] ?? null
+            ];
         }
-        
-        // If no capture required, return authorization result
-        return $this->handleAuthorizationResponse($authResponse, $paymentData);
     }
     
     /**
@@ -1240,6 +1295,32 @@ class EnhancedStripeBackend {
     }
     
     /**
+     * Process Stripe key - handle both base64 encoded and encrypted keys
+     */
+    private function processStripeKey($stripeKeyInput) {
+        // First, try base64 decoding
+        $decodedKey = base64_decode($stripeKeyInput, true);
+        if ($decodedKey !== false && $this->isValidStripeKey($decodedKey)) {
+            $this->logMessage('Using base64 decoded Stripe key');
+            return $decodedKey;
+        }
+        
+        // If base64 decoding fails or doesn't produce a valid key, try decryption
+        try {
+            $decryptedKey = $this->decryptData($stripeKeyInput);
+            if ($this->isValidStripeKey($decryptedKey)) {
+                $this->logMessage('Using decrypted Stripe key');
+                return $decryptedKey;
+            }
+        } catch (Exception $e) {
+            // Decryption failed, continue to error handling
+        }
+        
+        // If both methods fail, throw an exception
+        throw new Exception('Invalid Stripe key format - unable to decode or decrypt');
+    }
+
+    /**
      * Decrypt sensitive data
      */
     private function decryptData($encryptedData) {
@@ -1377,7 +1458,13 @@ class EnhancedStripeBackend {
         $required = ['stripeSecretKey', 'operation', 'amount', 'currency', 'cardData'];
         
         foreach ($required as $field) {
-            if (!isset($input[$field]) || empty($input[$field])) {
+            if (!isset($input[$field])) {
+                $this->logError("Validation failed: Missing field '$field'");
+                return ['valid' => false, 'error' => "Missing required field: $field"];
+            }
+            
+            if (empty($input[$field]) && $input[$field] !== 0) {
+                $this->logError("Validation failed: Empty field '$field'");
                 return ['valid' => false, 'error' => "Missing required field: $field"];
             }
         }
@@ -1386,6 +1473,7 @@ class EnhancedStripeBackend {
         $cardRequired = ['cardNumber', 'expiry', 'cvv'];
         foreach ($cardRequired as $field) {
             if (!isset($input['cardData'][$field]) || empty($input['cardData'][$field])) {
+                $this->logError("Validation failed: Missing card field '$field'");
                 return ['valid' => false, 'error' => "Missing required card field: $field"];
             }
         }
@@ -1393,13 +1481,18 @@ class EnhancedStripeBackend {
         // Validate operation type
         $validOperations = ['auth', 'charge', 'auth_capture'];
         if (!in_array($input['operation'], $validOperations)) {
+            $this->logError("Validation failed: Invalid operation type '" . $input['operation'] . "'");
             return ['valid' => false, 'error' => 'Invalid operation type'];
         }
         
         // Validate amount
         if (!is_numeric($input['amount']) || $input['amount'] < 0) {
+            $this->logError("Validation failed: Invalid amount '" . $input['amount'] . "'");
             return ['valid' => false, 'error' => 'Invalid amount'];
         }
+        
+        // Log successful validation
+        $this->logMessage("Input validation successful for operation: " . $input['operation']);
         
         return ['valid' => true];
     }
