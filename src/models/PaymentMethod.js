@@ -177,25 +177,25 @@ const PaymentMethod = sequelize.define('PaymentMethod', {
   timestamps: true,
   indexes: [
     {
-      fields: ['customerId']
+      fields: ['customer_id']
     },
     {
-      fields: ['cardToken']
+      fields: ['card_token']
     },
     {
-      fields: ['cardType']
+      fields: ['card_type']
     },
     {
-      fields: ['cardLast4']
+      fields: ['card_last4']
     },
     {
       fields: ['status']
     },
     {
-      fields: ['isDefault']
+      fields: ['is_default']
     },
     {
-      fields: ['createdAt']
+      fields: ['created_at']
     }
   ]
 });

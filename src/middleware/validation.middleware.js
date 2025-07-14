@@ -219,7 +219,12 @@ const schemas = {
     endDate: Joi.date().iso().optional(),
     merchantId: Joi.string().optional(),
     cvvProvided: Joi.boolean().optional()
-  }).concat(schemas.paginationQuery),
+  }).concat(Joi.object({
+    page: Joi.number().integer().min(1).default(1).optional(),
+    limit: Joi.number().integer().min(1).max(100).default(20).optional(),
+    sortBy: Joi.string().optional(),
+    sortOrder: Joi.string().valid('asc', 'desc').default('desc').optional()
+  })),
 
   // Parameter schemas
   uuidParam: Joi.object({

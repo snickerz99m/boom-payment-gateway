@@ -163,7 +163,7 @@ const Customer = sequelize.define('Customer', {
   timestamps: true,
   indexes: [
     {
-      fields: ['customerId']
+      fields: ['customer_id']
     },
     {
       fields: ['email']
@@ -172,10 +172,10 @@ const Customer = sequelize.define('Customer', {
       fields: ['status']
     },
     {
-      fields: ['riskLevel']
+      fields: ['risk_level']
     },
     {
-      fields: ['createdAt']
+      fields: ['created_at']
     }
   ]
 });
