@@ -14,32 +14,39 @@ This enhanced Stripe integration provides advanced features for card validation 
 
 ### 2. Real-time Stripe Key Validation
 - **Format Validation**: Automatically validates `sk_live_` and `sk_test_` key formats
-- **Live Status Check**: Verifies if the provided key is active and functional using `/v1/charges` endpoint
+- **Live Status Check**: Verifies if the provided key is active and functional using `/v1/balance` endpoint
 - **Enhanced Error Handling**: Detailed HTTP status codes, error messages, and response bodies for failed requests
 - **Visual Feedback**: Clear "Valid Key" or "Invalid Key" indicators with descriptive messages
 - **Comprehensive Logging**: Detailed logs including network errors, HTTP status codes, and timestamps
 
-### 3. Separate Result Categorization
+### 3. Threads and Delay Configuration
+- **Concurrent Processing**: Support for 1-10 concurrent threads for bulk card processing
+- **Configurable Delays**: Adjustable delays between requests (0-10000ms) to prevent rate limiting
+- **Batch Processing**: Smart batching system that distributes cards across multiple threads
+- **Real-time Monitoring**: Live status updates showing batch progress and thread activity
+- **Rate Limiting Protection**: Built-in delays and thread limits to prevent API abuse
+
+### 4. Separate Result Categorization
 - **Authorized Cards**: Successfully authorized cards (for $0 auth operations)
 - **Charged Cards**: Successfully charged cards (for charge operations)
 - **Declined Cards**: Cards declined with specific reasons (expired, stolen, etc.)
 - **CVV Issues**: Cards with CVV verification problems (CCN cards)
 - **Valid Cards**: Cards that are valid and ready for charging
 
-### 4. Enhanced Error Handling
+### 5. Enhanced Error Handling
 - **Detailed Decline Reasons**: Specific error messages for different failure types
 - **Error Categorization**: Automatic sorting of errors by type (CVV, expired, stolen, etc.)
 - **Network Error Handling**: Comprehensive logging of network issues with HTTP status codes
 - **Response Body Logging**: Complete response bodies for debugging network and API errors
 - **User-friendly Messages**: Clear, actionable error descriptions with suggestions
 
-### 5. Automatic Data Generation
+### 6. Automatic Data Generation
 - **Email Generation**: Realistic email addresses with various domain providers
 - **Name Generation**: Diverse first and last name combinations
 - **User Agent Rotation**: Multiple browser user agents for security
 - **Customer Data**: Complete customer profiles for each transaction
 
-### 6. Copy Functionality
+### 7. Copy Functionality
 - **Quick Copy**: One-click copy buttons for each result category
 - **Formatted Output**: Results formatted for easy use in other systems
 - **Clipboard Integration**: Direct copy to clipboard with visual feedback
@@ -48,7 +55,7 @@ This enhanced Stripe integration provides advanced features for card validation 
 
 ### Validation Workflow
 1. **Format Validation**: Checks if key starts with `sk_test_` or `sk_live_`
-2. **API Connectivity Test**: Uses `/v1/charges` endpoint to verify key validity
+2. **API Connectivity Test**: Uses `/v1/balance` endpoint to verify key validity
 3. **Error Categorization**: Classifies errors into authentication, network, or permission issues
 4. **Detailed Logging**: Records HTTP status codes, error messages, and response bodies
 
@@ -89,16 +96,22 @@ All validation attempts are logged with:
 #### 1. Stripe Key Configuration
 - Enter your Stripe secret key (`sk_live_` or `sk_test_`)
 - The system will automatically validate the key format
-- Live keys are validated using the `/v1/charges` endpoint as recommended by Stripe
+- Live keys are validated using the `/v1/balance` endpoint as recommended by Stripe
 - Validation includes HTTP status codes, error messages, and response bodies
 - Clear "Valid Key" or "Invalid Key" feedback is provided with detailed information
 
-#### 2. Operation Types
+#### 2. Processing Configuration
+- **Threads**: Set the number of concurrent processing threads (1-10)
+- **Delay**: Configure delay between requests in milliseconds (0-10000ms)
+- Higher thread counts process cards faster but use more resources
+- Delays help prevent rate limiting and API abuse
+
+#### 3. Operation Types
 - **$0 Authorization**: Authorize cards without charging (amount automatically set to $0)
 - **Charge**: Immediately charge the specified amount
 - **Auth & Capture**: Authorize first, then capture the payment
 
-#### 3. Bulk Card Processing
+#### 4. Bulk Card Processing
 Format your cards as follows:
 ```
 4111111111111111|12|25|123
@@ -107,7 +120,13 @@ Format your cards as follows:
 6011111111111117|05|24|789
 ```
 
-#### 4. Single Card Processing
+**Processing with Threads and Delays:**
+- Set threads to 3 and delay to 1000ms for slower, more controlled processing
+- Set threads to 1 and delay to 0ms for sequential processing with no delays
+- Higher thread counts (5-10) for faster bulk processing of large card lists
+- Recommended: 2-3 threads with 500-1000ms delay for optimal performance
+
+#### 5. Single Card Processing
 If no bulk cards are provided, the system will use the single card fields:
 - Card Number
 - Expiry (MM/YY)
