@@ -37,9 +37,6 @@ const createRateLimiter = (options = {}) => {
           }
         )
       );
-    },
-    onLimitReached: (req, res) => {
-      logger.warn(`Rate limit reached for IP: ${req.ip}`);
     }
   };
 

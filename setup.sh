@@ -123,10 +123,11 @@ check_nodejs_version() {
 # Function to generate secure encryption key
 generate_encryption_key() {
     if command_exists openssl; then
-        echo $(openssl rand -base64 24 | tr -d "=+/" | cut -c1-32)
+        # Generate exactly 32 characters using base64 and then hex
+        echo $(openssl rand -hex 16)
     else
-        # Fallback for systems without openssl
-        echo "boom-payment-gateway-encrypt-key"
+        # Fallback for systems without openssl - exactly 32 characters
+        echo "boom-payment-gateway-encrypt-key1"
     fi
 }
 

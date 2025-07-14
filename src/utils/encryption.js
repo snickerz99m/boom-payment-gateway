@@ -24,7 +24,7 @@ const encrypt = (text) => {
     }
 
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipher(ALGORITHM, ENCRYPTION_KEY);
+    const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
     cipher.setAAD(Buffer.from('boom-payment-gateway', 'utf8'));
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -63,7 +63,7 @@ const decrypt = (encryptedText) => {
     const tag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
-    const decipher = crypto.createDecipher(ALGORITHM, ENCRYPTION_KEY);
+    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
     decipher.setAAD(Buffer.from('boom-payment-gateway', 'utf8'));
     decipher.setAuthTag(tag);
 

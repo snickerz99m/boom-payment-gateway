@@ -64,6 +64,57 @@ This is a **complete payment gateway system** that:
 
 ---
 
+## 🔐 **API Authentication & Security**
+
+### **API Key Management**
+The payment gateway uses API keys for secure external access:
+
+1. **Default API Keys** (found in `.env` file):
+   ```
+   API_KEYS=boom-api-key-dev,boom-api-key-prod
+   ```
+
+2. **Using API Keys in Requests**:
+   ```javascript
+   // Include API key in request headers
+   fetch('/api/v1/payments/process', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'X-API-Key': 'boom-api-key-dev'
+     },
+     body: JSON.stringify(paymentData)
+   });
+   ```
+
+### **Security Features**
+- ✅ **Encryption**: All sensitive data encrypted with AES-256-GCM
+- ✅ **Rate Limiting**: Prevents abuse with configurable limits
+- ✅ **Token-based Card Storage**: Never stores actual card numbers
+- ✅ **Secure Headers**: Helmet.js protection enabled
+- ✅ **Input Validation**: Joi schema validation for all inputs
+
+---
+
+## 📋 **Recent Improvements**
+
+### **Version 1.0.0 Updates**
+- ✅ **Fixed Deprecated Packages**: Updated all deprecated dependencies
+- ✅ **Enhanced Security**: Modern encryption methods (createCipheriv/createDecipheriv)
+- ✅ **Improved Setup**: Automated .env generation with secure 32-character encryption keys
+- ✅ **PayPal Integration**: Updated to latest PayPal Server SDK
+- ✅ **Better Rate Limiting**: Removed deprecated express-rate-limit options
+- ✅ **Automated Testing**: All 28 tests passing with comprehensive coverage
+
+### **Package Updates**
+- `@paypal/checkout-server-sdk` → `@paypal/paypal-server-sdk@1.1.0`
+- `multer@1.4.5-lts.1` → `multer@2.0.1`
+- `supertest@6.3.3` → `supertest@7.1.3`
+- Fixed crypto deprecation warnings
+- Removed express-rate-limit `onLimitReached` deprecation
+
+---
+
 ## 🔌 **API Integration for Shopping Sites**
 
 ### **Payment Processing Endpoint**
@@ -1025,5 +1076,65 @@ MIT License - feel free to use this in your projects!
 - [ ] Set up HTTPS certificates
 - [ ] Configure production CORS settings
 - [ ] Test API key authentication
+
+---
+
+## 🧪 **Testing the Payment Gateway**
+
+### **Automated Testing**
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode (development)
+npm run test:watch
+```
+
+### **Test Card Numbers**
+Use these test cards for development:
+
+| Card Brand | Card Number | Result |
+|------------|-------------|--------|
+| Visa | `4111111111111111` | ✅ Success |
+| Visa | `4000000000000002` | ❌ Declined |
+| Mastercard | `5555555555554444` | ✅ Success |
+| American Express | `378282246310005` | ✅ Success |
+| Discover | `6011111111111117` | ✅ Success |
+
+### **API Testing with cURL**
+```bash
+# Health Check
+curl http://localhost:3000/health
+
+# Process Payment
+curl -X POST http://localhost:3000/api/v1/payments/process \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: boom-api-key-dev" \
+  -d '{
+    "amount": 2999,
+    "currency": "USD",
+    "cardData": {
+      "cardNumber": "4111111111111111",
+      "expiryDate": "12/25",
+      "cvv": "123",
+      "cardholderName": "John Doe"
+    },
+    "customerData": {
+      "email": "test@example.com",
+      "firstName": "John",
+      "lastName": "Doe"
+    }
+  }'
+```
+
+### **Admin Panel Testing**
+1. **Access**: `http://localhost:3000/admin`
+2. **Login**: `admin@boom-payments.com` / `password`
+3. **Test**: Dashboard, transactions, refunds
+
+---
 
 **You're ready to accept payments! 🚀**
