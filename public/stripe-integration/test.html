@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .test-button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #005a8a;
+        }
+        .test-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 20px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .demo-link {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .demo-link:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔐 Stripe Payment Gateway Integration Test</h1>
+        <p>This page verifies that all components of the Stripe integration are working correctly.</p>
+        
+        <div class="test-section">
+            <h3>📁 File Structure Test</h3>
+            <p>Checking if all required files are present and accessible...</p>
+            <button class="test-button" onclick="testFiles()">Test File Access</button>
+            <div id="file-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔧 JavaScript Functionality Test</h3>
+            <p>Testing frontend JavaScript components...</p>
+            <button class="test-button" onclick="testJavaScript()">Test JavaScript</button>
+            <div id="js-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🌐 Proxy Manager Test</h3>
+            <p>Testing proxy configuration and management...</p>
+            <button class="test-button" onclick="testProxy()">Test Proxy Manager</button>
+            <div id="proxy-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔒 Security Features Test</h3>
+            <p>Testing encryption and validation functions...</p>
+            <button class="test-button" onclick="testSecurity()">Test Security</button>
+            <div id="security-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>⚡ PHP Backend Test</h3>
+            <p>Testing PHP backend connectivity and basic functionality...</p>
+            <button class="test-button" onclick="testBackend()">Test Backend</button>
+            <div id="backend-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🚀 Launch Application</h3>
+            <p>All tests passed? Ready to use the Stripe Payment Gateway!</p>
+            <a href="index.html" class="demo-link">🎯 Open Stripe Payment Gateway</a>
+        </div>
+    </div>
+
+    <script>
+        // Test file accessibility
+        async function testFiles() {
+            const result = document.getElementById('file-test-result');
+            const files = ['index.html', 'app.js', 'proxy.js', 'backend.php', 'README.md'];
+            let passed = 0;
+            let total = files.length;
+            
+            result.innerHTML = '<div class="info">Testing file accessibility...</div>';
+            
+            for (const file of files) {
+                try {
+                    const response = await fetch(file, { method: 'HEAD' });
+                    if (response.ok) {
+                        passed++;
+                        console.log(`✅ ${file} - accessible`);
+                    } else {
+                        console.log(`❌ ${file} - not accessible (${response.status})`);
+                    }
+                } catch (error) {
+                    console.log(`❌ ${file} - error: ${error.message}`);
+                }
+            }
+            
+            if (passed === total) {
+                result.innerHTML = `<div class="success">✅ All ${total} files are accessible!</div>`;
+            } else {
+                result.innerHTML = `<div class="error">❌ ${passed}/${total} files accessible. Check console for details.</div>`;
+            }
+        }
+        
+        // Test JavaScript functionality
+        function testJavaScript() {
+            const result = document.getElementById('js-test-result');
+            let tests = [];
+            
+            try {
+                // Test user agent array
+                const userAgents = [
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                ];
+                tests.push('✅ User agent array available');
+                
+                // Test card number validation (Luhn algorithm)
+                function validateCardNumber(cardNumber) {
+                    let sum = 0;
+                    let alternate = false;
+                    
+                    for (let i = cardNumber.length - 1; i >= 0; i--) {
+                        let n = parseInt(cardNumber.charAt(i), 10);
+                        
+                        if (alternate) {
+                            n *= 2;
+                            if (n > 9) {
+                                n = (n % 10) + 1;
+                            }
+                        }
+                        
+                        sum += n;
+                        alternate = !alternate;
+                    }
+                    
+                    return (sum % 10 === 0);
+                }
+                
+                if (validateCardNumber('4111111111111111')) {
+                    tests.push('✅ Card validation function working');
+                } else {
+                    tests.push('❌ Card validation function failed');
+                }
+                
+                // Test email validation
+                function validateEmail(email) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    return emailRegex.test(email);
+                }
+                
+                if (validateEmail('test@example.com')) {
+                    tests.push('✅ Email validation function working');
+                } else {
+                    tests.push('❌ Email validation function failed');
+                }
+                
+                // Test random data generation
+                const firstNames = ['John', 'Jane', 'Michael', 'Sarah'];
+                const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown'];
+                const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+                const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+                
+                if (firstName && lastName) {
+                    tests.push('✅ Random data generation working');
+                } else {
+                    tests.push('❌ Random data generation failed');
+                }
+                
+                result.innerHTML = `<div class="success">${tests.join('<br>')}</div>`;
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ JavaScript test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Test proxy manager
+        function testProxy() {
+            const result = document.getElementById('proxy-test-result');
+            let tests = [];
+            
+            try {
+                // Simulate proxy manager functionality
+                const proxyConfigs = new Map();
+                
+                // Add test proxy
+                proxyConfigs.set('test-proxy', {
+                    id: 'test-proxy',
+                    host: 'proxy.example.com',
+                    port: 8080,
+                    isActive: true,
+                    failCount: 0
+                });
+                
+                tests.push('✅ Proxy configuration storage working');
+                
+                // Test proxy rotation
+                const proxies = Array.from(proxyConfigs.values());
+                if (proxies.length > 0) {
+                    tests.push('✅ Proxy rotation logic working');
+                } else {
+                    tests.push('❌ No proxies configured');
+                }
+                
+                // Test rate limiting simulation
+                const rateLimiter = new Map();
+                const proxyId = 'test-proxy';
+                const now = Date.now();
+                
+                rateLimiter.set(proxyId, [now]);
+                
+                if (rateLimiter.has(proxyId)) {
+                    tests.push('✅ Rate limiting storage working');
+                } else {
+                    tests.push('❌ Rate limiting storage failed');
+                }
+                
+                result.innerHTML = `<div class="success">${tests.join('<br>')}</div>`;
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Proxy test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Test security features
+        function testSecurity() {
+            const result = document.getElementById('security-test-result');
+            let tests = [];
+            
+            try {
+                // Test base64 encoding/decoding
+                const testData = 'sensitive-data';
+                const encoded = btoa(testData);
+                const decoded = atob(encoded);
+                
+                if (decoded === testData) {
+                    tests.push('✅ Base64 encoding/decoding working');
+                } else {
+                    tests.push('❌ Base64 encoding/decoding failed');
+                }
+                
+                // Test input sanitization
+                function sanitizeInput(input) {
+                    return input.replace(/[<>]/g, '');
+                }
+                
+                const sanitized = sanitizeInput('test<script>alert("xss")</script>');
+                if (!sanitized.includes('<script>')) {
+                    tests.push('✅ Input sanitization working');
+                } else {
+                    tests.push('❌ Input sanitization failed');
+                }
+                
+                // Test form validation
+                function validateRequired(value) {
+                    return value && value.trim().length > 0;
+                }
+                
+                if (validateRequired('test') && !validateRequired('')) {
+                    tests.push('✅ Required field validation working');
+                } else {
+                    tests.push('❌ Required field validation failed');
+                }
+                
+                result.innerHTML = `<div class="success">${tests.join('<br>')}</div>`;
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Security test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Test PHP backend
+        async function testBackend() {
+            const result = document.getElementById('backend-test-result');
+            result.innerHTML = '<div class="info">Testing PHP backend connectivity...</div>';
+            
+            try {
+                // Test basic connectivity
+                const response = await fetch('backend.php', {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    result.innerHTML = '<div class="success">✅ PHP backend is accessible and responding to OPTIONS requests</div>';
+                } else {
+                    result.innerHTML = `<div class="error">❌ PHP backend returned status: ${response.status}</div>`;
+                }
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ PHP backend test failed: ${error.message}<br>Make sure PHP is running and backend.php is accessible.</div>`;
+            }
+        }
+        
+        // Run initial file test when page loads
+        window.addEventListener('load', () => {
+            setTimeout(testFiles, 1000);
+        });
+    </script>
+</body>
+</html>

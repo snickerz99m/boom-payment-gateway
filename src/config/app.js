@@ -127,6 +127,9 @@ const createApp = () => {
   // Static file serving for demo
   app.use('/demo', express.static(path.join(__dirname, '../../public/demo')));
 
+  // Static file serving for stripe integration
+  app.use('/stripe-integration', express.static(path.join(__dirname, '../../public/stripe-integration')));
+
   // Redirect root to admin panel
   app.get('/', (req, res) => {
     res.redirect('/admin');
