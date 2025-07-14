@@ -19,7 +19,7 @@ if (ENCRYPTION_KEY.length !== 32) {
  */
 const encrypt = (text) => {
   try {
-    if (!text || typeof text !== 'string') {
+    if (text === null || text === undefined || typeof text !== 'string') {
       throw new Error('Invalid input for encryption');
     }
 
@@ -50,7 +50,7 @@ const encrypt = (text) => {
  */
 const decrypt = (encryptedText) => {
   try {
-    if (!encryptedText || typeof encryptedText !== 'string') {
+    if (encryptedText === null || encryptedText === undefined || typeof encryptedText !== 'string') {
       throw new Error('Invalid input for decryption');
     }
 
@@ -234,6 +234,12 @@ const generateHmacSignature = (data, secret) => {
 const verifyHmacSignature = (data, signature, secret) => {
   try {
     const expectedSignature = generateHmacSignature(data, secret);
+    
+    // Ensure both signatures are the same length
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+    
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')

@@ -219,8 +219,17 @@ const validatePhone = (phone) => {
       return false;
     }
 
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.replace(/\D/g, ''));
+    // Remove all non-digit characters except + at the beginning
+    const cleanPhone = phone.replace(/[^+0-9]/g, '');
+    
+    // Check if it starts with + and has at least 10 digits total
+    if (cleanPhone.startsWith('+')) {
+      // International format: +1234567890 (minimum 10 digits after +)
+      return cleanPhone.length >= 11 && cleanPhone.length <= 16;
+    } else {
+      // National format: 1234567890 (minimum 10 digits)
+      return cleanPhone.length >= 10 && cleanPhone.length <= 15;
+    }
   } catch (error) {
     logger.error('Phone validation failed:', error);
     return false;
