@@ -8,6 +8,7 @@ const Customer = require('../src/models/Customer');
 const PaymentMethod = require('../src/models/PaymentMethod');
 const Transaction = require('../src/models/Transaction');
 const Refund = require('../src/models/Refund');
+const BankAccount = require('../src/models/BankAccount');
 
 // Define associations
 const setupAssociations = () => {
@@ -18,6 +19,16 @@ const setupAssociations = () => {
   });
   PaymentMethod.belongsTo(Customer, {
     foreignKey: 'customerId',
+    as: 'customer'
+  });
+
+  // Customer has many BankAccounts
+  Customer.hasMany(BankAccount, {
+    foreignKey: 'customer_id',
+    as: 'bankAccounts'
+  });
+  BankAccount.belongsTo(Customer, {
+    foreignKey: 'customer_id',
     as: 'customer'
   });
 
@@ -113,7 +124,7 @@ const initializeDatabase = async () => {
     setupAssociations();
 
     // Sync models (alter existing tables if needed)
-    await sequelize.sync({ alter: true });
+    await sequelize.sync({ force: false });
     logger.info('Database models synchronized successfully');
 
     logger.info('Database initialization completed successfully');
@@ -129,7 +140,7 @@ const dropAllTables = async () => {
     logger.warn('Dropping all tables...');
     
     // Drop tables in reverse order to avoid foreign key constraints
-    const tables = ['refunds', 'transactions', 'payment_methods', 'customers'];
+    const tables = ['refunds', 'transactions', 'payment_methods', 'bank_accounts', 'customers'];
     
     for (const table of tables) {
       try {
@@ -154,34 +165,18 @@ const dropAllTables = async () => {
 // Create database if it doesn't exist
 const createDatabase = async () => {
   try {
-    const dbName = process.env.DB_NAME || 'payments';
-    const { Client } = require('pg');
+    const dbPath = process.env.DB_PATH || path.join(__dirname, '../../database/payments.sqlite');
+    const dbDir = path.dirname(dbPath);
     
-    const client = new Client({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      user: process.env.DB_USER || 'username',
-      password: process.env.DB_PASSWORD || 'password',
-      database: 'postgres' // Connect to default postgres database
-    });
-
-    await client.connect();
-    
-    // Check if database exists
-    const result = await client.query(
-      'SELECT 1 FROM pg_database WHERE datname = $1',
-      [dbName]
-    );
-
-    if (result.rows.length === 0) {
-      logger.info(`Creating database: ${dbName}`);
-      await client.query(`CREATE DATABASE "${dbName}"`);
-      logger.info(`Database ${dbName} created successfully`);
-    } else {
-      logger.info(`Database ${dbName} already exists`);
+    // Create database directory if it doesn't exist
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      logger.info(`Created database directory: ${dbDir}`);
     }
-
-    await client.end();
+    
+    // SQLite will create the database file automatically when first accessed
+    logger.info(`Database will be created at: ${dbPath}`);
+    
   } catch (error) {
     logger.error('Database creation failed:', error);
     throw error;

@@ -1,15 +1,12 @@
 const { Sequelize } = require('sequelize');
 const winston = require('winston');
+const path = require('path');
 require('dotenv').config();
 
 // Database configuration
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'payments',
-  username: process.env.DB_USER || 'username',
-  password: process.env.DB_PASSWORD || 'password',
-  dialect: 'postgres',
+  dialect: 'sqlite',
+  storage: process.env.DB_PATH || path.join(__dirname, '../../database/payments.sqlite'),
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   pool: {
     max: 10,
@@ -26,12 +23,7 @@ const dbConfig = {
 };
 
 // Create Sequelize instance
-const sequelize = new Sequelize(
-  dbConfig.database,
-  dbConfig.username,
-  dbConfig.password,
-  dbConfig
-);
+const sequelize = new Sequelize(dbConfig);
 
 // Test database connection
 const testConnection = async () => {
