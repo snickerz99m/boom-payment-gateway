@@ -100,12 +100,13 @@ class EnhancedStripeBackend {
         } catch (Exception $e) {
             $this->logError('Payment processing exception: ' . $e->getMessage());
             
-            // Provide more detailed error information
+            // SAFETY FIX: Safely access input variables that might not be defined
+            // This prevents errors when exceptions occur before input is processed
             $errorDetails = [
                 'error_message' => $e->getMessage(),
-                'operation' => $input['operation'] ?? 'unknown',
-                'amount' => $input['amount'] ?? 'unknown',
-                'currency' => $input['currency'] ?? 'unknown',
+                'operation' => isset($input['operation']) ? $input['operation'] : 'unknown',
+                'amount' => isset($input['amount']) ? $input['amount'] : 'unknown',
+                'currency' => isset($input['currency']) ? $input['currency'] : 'unknown',
                 'trace' => $e->getTraceAsString()
             ];
             
@@ -213,9 +214,12 @@ class EnhancedStripeBackend {
         // Generate customer data if not provided
         $customerData = $this->generateEnhancedCustomerData($input);
         
+        // Normalize amount to integer (Stripe expects amounts in cents)
+        $amount = (int)$input['amount'];
+        
         // Prepare Stripe payment data
         $paymentData = [
-            'amount' => $input['amount'],
+            'amount' => $amount,
             'currency' => $input['currency'],
             'payment_method_data' => [
                 'type' => 'card',
@@ -858,16 +862,19 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Add logging helper method
+     * Add logging helper method - with safer IP address handling
      */
     private function logMessage($message) {
         $logEntry = [
             'timestamp' => date('Y-m-d H:i:s'),
-            'ip' => $_SERVER['REMOTE_ADDR'],
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
             'message' => $message
         ];
         
-        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        // Ensure log directory exists and is writable
+        if (is_writable(dirname($this->logFile))) {
+            file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        }
     }
     
     /**
@@ -1427,15 +1434,18 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Set security headers
+     * Set security headers - suppress errors for testing environments
      */
     private function setSecurityHeaders() {
-        header('X-Content-Type-Options: nosniff');
-        header('X-Frame-Options: DENY');
-        header('X-XSS-Protection: 1; mode=block');
-        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
-        header('Content-Security-Policy: default-src \'self\'');
-        header('Referrer-Policy: strict-origin-when-cross-origin');
+        // Only set headers if we're in a web environment and headers haven't been sent
+        if (!headers_sent()) {
+            header('X-Content-Type-Options: nosniff');
+            header('X-Frame-Options: DENY');
+            header('X-XSS-Protection: 1; mode=block');
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+            header('Content-Security-Policy: default-src \'self\'');
+            header('Referrer-Policy: strict-origin-when-cross-origin');
+        }
     }
     
     /**
@@ -1453,6 +1463,12 @@ class EnhancedStripeBackend {
     
     /**
      * Validate input data
+     * 
+     * FIXES IMPLEMENTED:
+     * - Fixed string amount validation (e.g., "2999", "0" now accepted)
+     * - Improved numeric validation to accept string numbers
+     * - Better error messages for different validation failures
+     * - Safer logging for edge cases (arrays, objects)
      */
     private function validateInput($input) {
         $required = ['stripeSecretKey', 'operation', 'amount', 'currency', 'cardData'];
@@ -1463,9 +1479,25 @@ class EnhancedStripeBackend {
                 return ['valid' => false, 'error' => "Missing required field: $field"];
             }
             
-            if (empty($input[$field]) && $input[$field] !== 0) {
-                $this->logError("Validation failed: Empty field '$field'");
-                return ['valid' => false, 'error' => "Missing required field: $field"];
+            // Special handling for amount field - allow numeric strings
+            // This fixes the main issue where "2999" and "0" were being rejected
+            if ($field === 'amount') {
+                if ($input[$field] === null || $input[$field] === false || $input[$field] === '') {
+                    $this->logError("Validation failed: Empty/null amount field");
+                    return ['valid' => false, 'error' => "Missing required field: $field"];
+                }
+                // Allow numeric strings (e.g., "0", "2999") and numbers (0, 2999)
+                if (!is_numeric($input[$field])) {
+                    $amountForLog = is_scalar($input[$field]) ? $input[$field] : gettype($input[$field]);
+                    $this->logError("Validation failed: Non-numeric amount '" . $amountForLog . "'");
+                    return ['valid' => false, 'error' => "Invalid amount - must be numeric"];
+                }
+            } else {
+                // For other fields, use the original logic
+                if (empty($input[$field]) && $input[$field] !== 0) {
+                    $this->logError("Validation failed: Empty field '$field'");
+                    return ['valid' => false, 'error' => "Missing required field: $field"];
+                }
             }
         }
         
@@ -1485,10 +1517,11 @@ class EnhancedStripeBackend {
             return ['valid' => false, 'error' => 'Invalid operation type'];
         }
         
-        // Validate amount
-        if (!is_numeric($input['amount']) || $input['amount'] < 0) {
-            $this->logError("Validation failed: Invalid amount '" . $input['amount'] . "'");
-            return ['valid' => false, 'error' => 'Invalid amount'];
+        // Additional amount validation (ensure it's not negative)
+        if (is_numeric($input['amount']) && $input['amount'] < 0) {
+            $amountForLog = is_scalar($input['amount']) ? $input['amount'] : gettype($input['amount']);
+            $this->logError("Validation failed: Negative amount '" . $amountForLog . "'");
+            return ['valid' => false, 'error' => 'Invalid amount - must be non-negative'];
         }
         
         // Log successful validation
@@ -1517,23 +1550,28 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Log error
+     * Log error - with safer IP address handling
      */
     private function logError($message) {
         $logEntry = [
             'timestamp' => date('Y-m-d H:i:s'),
-            'ip' => $_SERVER['REMOTE_ADDR'],
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
             'error' => $message
         ];
         
-        file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        // Ensure log directory exists and is writable
+        if (is_writable(dirname($this->logFile))) {
+            file_put_contents($this->logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
+        }
     }
     
     /**
-     * Send success response
+     * Send success response - with safer header handling
      */
     private function sendSuccessResponse($data) {
-        header('Content-Type: application/json');
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+        }
         echo json_encode([
             'success' => true,
             'data' => $data,
@@ -1542,11 +1580,13 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Send error response
+     * Send error response - with safer header handling
      */
     private function sendErrorResponse($message, $statusCode = 400) {
-        http_response_code($statusCode);
-        header('Content-Type: application/json');
+        if (!headers_sent()) {
+            http_response_code($statusCode);
+            header('Content-Type: application/json');
+        }
         echo json_encode([
             'success' => false,
             'error' => $message,

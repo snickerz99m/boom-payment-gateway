@@ -121,3 +121,58 @@
 {"timestamp":"2025-07-14 19:47:52","ip":null,"error":"Validation failed: Missing field 'amount'"}
 {"timestamp":"2025-07-14 19:47:52","ip":null,"message":"Input validation successful for operation: auth_capture"}
 {"timestamp":"2025-07-14 19:47:52","ip":null,"message":"Using base64 decoded Stripe key"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","error":"Validation failed: Empty field 'amount'"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","error":"Validation failed: Empty field 'amount'"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:49:20","ip":"127.0.0.1","error":"Validation failed: Empty field 'amount'"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","error":"Validation failed: Empty\/null amount field"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:50:55","ip":"127.0.0.1","error":"Validation failed: Empty\/null amount field"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'abc'"}
+{"timestamp":"2025-07-14 19:51:23","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'Array'"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'abc'"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'array'"}
+{"timestamp":"2025-07-14 19:51:51","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'object'"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: auth_capture"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","message":"Input validation successful for operation: charge"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","error":"Validation failed: Empty\/null amount field"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:53:24","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'abc'"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: auth"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: auth_capture"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","message":"Input validation successful for operation: charge"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","error":"Validation failed: Empty\/null amount field"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","error":"Validation failed: Missing field 'amount'"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","error":"Validation failed: Negative amount '-1'"}
+{"timestamp":"2025-07-14 19:54:29","ip":"127.0.0.1","error":"Validation failed: Non-numeric amount 'abc'"}
