@@ -84,7 +84,16 @@ class EnhancedStripeGateway {
         stripeSecretKey.addEventListener('blur', () => {
             const key = stripeSecretKey.value.trim();
             if (key) {
+                this.validateStripeKeyComprehensive(key);
+            }
+        });
+        
+        stripeSecretKey.addEventListener('input', () => {
+            const key = stripeSecretKey.value.trim();
+            if (key) {
                 this.validateStripeKeyFormat(key);
+            } else {
+                keyValidation.style.display = 'none';
             }
         });
     }
@@ -93,7 +102,8 @@ class EnhancedStripeGateway {
         const keyValidation = document.getElementById('keyValidation');
         
         keyValidation.className = 'validation-status checking';
-        keyValidation.textContent = '🔍 Validating key format...';
+        keyValidation.textContent = '🔍 Checking key format...';
+        keyValidation.style.display = 'block';
         
         // Basic format validation
         if (!key.match(/^sk_(test|live)_[a-zA-Z0-9]+$/)) {
@@ -105,13 +115,96 @@ class EnhancedStripeGateway {
         // Check if it's a live key
         if (key.startsWith('sk_live_')) {
             keyValidation.className = 'validation-status valid';
-            keyValidation.textContent = '✅ Live key detected - Ready for production processing';
+            keyValidation.textContent = '✅ Live key format valid - Testing connectivity...';
         } else {
             keyValidation.className = 'validation-status valid';
-            keyValidation.textContent = '✅ Test key detected - Ready for testing';
+            keyValidation.textContent = '✅ Test key format valid - Testing connectivity...';
         }
         
         return true;
+    }
+    
+    async validateStripeKeyComprehensive(key) {
+        const keyValidation = document.getElementById('keyValidation');
+        
+        if (!this.validateStripeKeyFormat(key)) {
+            return;
+        }
+        
+        keyValidation.className = 'validation-status checking';
+        keyValidation.textContent = '🔍 Validating key with Stripe API...';
+        
+        try {
+            // Encrypt the key for transmission
+            const encryptedKey = this.encryptData(key);
+            
+            // Make validation request
+            const response = await fetch('backend.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'validate_key',
+                    stripeSecretKey: encryptedKey
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const validation = result.data.validation;
+                const keyType = result.data.key_type;
+                
+                if (validation.valid) {
+                    keyValidation.className = 'validation-status valid';
+                    
+                    let statusMessage = `✅ ${keyType.toUpperCase()} key is valid and active`;
+                    
+                    // Add account information if available
+                    if (validation.account_id) {
+                        statusMessage += `\n🏦 Account: ${validation.account_id}`;
+                    }
+                    
+                    if (validation.country) {
+                        statusMessage += `\n🌍 Country: ${validation.country}`;
+                    }
+                    
+                    if (validation.charges_enabled !== undefined) {
+                        statusMessage += `\n💳 Charges: ${validation.charges_enabled ? 'Enabled' : 'Disabled'}`;
+                    }
+                    
+                    if (validation.payouts_enabled !== undefined) {
+                        statusMessage += `\n💰 Payouts: ${validation.payouts_enabled ? 'Enabled' : 'Disabled'}`;
+                    }
+                    
+                    keyValidation.textContent = statusMessage;
+                    
+                    // Log successful validation
+                    this.logMessage(`✅ ${keyType.toUpperCase()} key validation successful`);
+                } else {
+                    keyValidation.className = 'validation-status invalid';
+                    keyValidation.textContent = `❌ ${validation.message}`;
+                    
+                    // Show error suggestions if available
+                    if (validation.suggestions) {
+                        keyValidation.textContent += '\n💡 Suggestions:\n' + validation.suggestions.join('\n');
+                    }
+                    
+                    // Log validation failure
+                    this.logMessage(`❌ Key validation failed: ${validation.message}`);
+                }
+            } else {
+                keyValidation.className = 'validation-status invalid';
+                keyValidation.textContent = `❌ Validation failed: ${result.message || 'Unknown error'}`;
+                this.logMessage(`❌ Key validation error: ${result.message || 'Unknown error'}`);
+            }
+            
+        } catch (error) {
+            keyValidation.className = 'validation-status invalid';
+            keyValidation.textContent = `❌ Network error: ${error.message}`;
+            this.logMessage(`❌ Key validation network error: ${error.message}`);
+        }
     }
     
     handleBulkCardsInput(e) {
@@ -177,8 +270,62 @@ class EnhancedStripeGateway {
         
         return results.map(result => {
             const maskedCard = this.maskCardNumber(result.cardNumber);
-            return `${maskedCard}|${result.expiry}|${result.cvv} - ${result.status}${result.reason ? ` (${result.reason})` : ''}`;
+            let line = `${maskedCard}|${result.expiry}|${result.cvv} - ${result.status}`;
+            
+            // Add reason
+            if (result.reason) {
+                line += ` (${result.reason})`;
+            }
+            
+            // Add additional details for successful transactions
+            if (result.details && result.details.transactionId) {
+                line += ` [ID: ${result.details.transactionId}]`;
+            }
+            
+            // Add error details for failed transactions
+            if (result.details && result.details.errorType) {
+                line += ` [Type: ${result.details.errorType}]`;
+                if (result.details.declineCode && result.details.declineCode !== 'unknown') {
+                    line += ` [Code: ${result.details.declineCode}]`;
+                }
+                if (result.details.httpStatus) {
+                    line += ` [HTTP: ${result.details.httpStatus}]`;
+                }
+            }
+            
+            return line;
         }).join('\n');
+    }
+    
+    updateResultBoxes() {
+        document.getElementById('authorizedCards').textContent = this.formatResults(this.results.authorized);
+        document.getElementById('chargedCards').textContent = this.formatResults(this.results.charged);
+        document.getElementById('declinedCards').textContent = this.formatResults(this.results.declined);
+        document.getElementById('cvvIssues').textContent = this.formatResults(this.results.cvvIssues);
+        document.getElementById('validCards').textContent = this.formatResults(this.results.valid);
+        document.getElementById('processingLog').textContent = this.results.log.join('\n');
+        
+        // Update result box headers with counts
+        this.updateResultBoxHeaders();
+    }
+    
+    updateResultBoxHeaders() {
+        const updateHeader = (boxId, results, label) => {
+            const box = document.getElementById(boxId);
+            if (box) {
+                const header = box.querySelector('.result-header h3');
+                if (header) {
+                    const count = results.length;
+                    header.textContent = `${label} (${count})`;
+                }
+            }
+        };
+        
+        updateHeader('authorizedBox', this.results.authorized, '✅ Authorized Cards');
+        updateHeader('chargedBox', this.results.charged, '💰 Charged Cards');
+        updateHeader('declinedBox', this.results.declined, '❌ Declined Cards');
+        updateHeader('cvvIssuesBox', this.results.cvvIssues, '🔒 CVV Issues (CCN Cards)');
+        updateHeader('validBox', this.results.valid, '🟢 Valid Cards (Ready for Charging)');
     }
     
     maskCardNumber(cardNumber) {
@@ -555,7 +702,8 @@ class EnhancedStripeGateway {
             expiry: cardData.expiry,
             cvv: cardData.cvv,
             status: '',
-            reason: ''
+            reason: '',
+            details: null
         };
         
         if (response.success) {
@@ -563,16 +711,30 @@ class EnhancedStripeGateway {
                 case 'authorization':
                     result.status = 'AUTHORIZED';
                     result.reason = 'Card authorized successfully';
+                    result.details = {
+                        transactionId: response.transactionId,
+                        amount: response.amount || 0
+                    };
                     this.results.authorized.push(result);
                     break;
                 case 'charge':
                     result.status = 'CHARGED';
                     result.reason = `Charged $${response.amount}`;
+                    result.details = {
+                        transactionId: response.transactionId,
+                        amount: response.amount
+                    };
                     this.results.charged.push(result);
                     break;
                 case 'auth_capture':
                     result.status = 'CHARGED';
                     result.reason = `Auth & Captured $${response.amount}`;
+                    result.details = {
+                        transactionId: response.transactionId,
+                        authorizationId: response.authorization_id,
+                        captureId: response.capture_id,
+                        amount: response.amount
+                    };
                     this.results.charged.push(result);
                     break;
                 default:
@@ -581,33 +743,95 @@ class EnhancedStripeGateway {
                     this.results.valid.push(result);
             }
         } else {
-            // Handle different types of failures
+            // Enhanced error handling with detailed categorization
+            result.details = {
+                errorType: response.error_type || 'unknown',
+                declineCode: response.decline_code || 'unknown',
+                httpStatus: response.http_status || null,
+                suggestions: response.suggestions || []
+            };
+            
+            // Handle different types of failures with specific categories
+            const errorType = response.error_type || 'unknown';
             const errorMessage = response.error?.toLowerCase() || '';
             
-            if (errorMessage.includes('cvv') || errorMessage.includes('cvc')) {
-                result.status = 'CVV_ISSUE';
-                result.reason = 'CVV verification failed';
-                this.results.cvvIssues.push(result);
-            } else if (errorMessage.includes('expired')) {
-                result.status = 'EXPIRED';
-                result.reason = 'Card has expired';
-                this.results.declined.push(result);
-            } else if (errorMessage.includes('stolen') || errorMessage.includes('fraud')) {
-                result.status = 'STOLEN';
-                result.reason = 'Card flagged as stolen/fraudulent';
-                this.results.declined.push(result);
-            } else if (errorMessage.includes('insufficient')) {
-                result.status = 'INSUFFICIENT_FUNDS';
-                result.reason = 'Insufficient funds';
-                this.results.declined.push(result);
-            } else {
-                result.status = 'DECLINED';
-                result.reason = response.error || 'Unknown error';
-                this.results.declined.push(result);
+            switch (errorType) {
+                case 'authentication_error':
+                    result.status = 'KEY_ERROR';
+                    result.reason = 'Stripe key authentication failed';
+                    this.results.declined.push(result);
+                    break;
+                    
+                case 'permission_error':
+                    result.status = 'PERMISSION_ERROR';
+                    result.reason = 'Insufficient permissions or account not activated';
+                    this.results.declined.push(result);
+                    break;
+                    
+                case 'network_error':
+                    result.status = 'NETWORK_ERROR';
+                    result.reason = 'Network connection failed';
+                    this.results.declined.push(result);
+                    break;
+                    
+                case 'card_error':
+                default:
+                    // Card-specific errors
+                    if (errorMessage.includes('cvv') || errorMessage.includes('cvc')) {
+                        result.status = 'CVV_ISSUE';
+                        result.reason = 'CVV verification failed';
+                        this.results.cvvIssues.push(result);
+                    } else if (errorMessage.includes('expired')) {
+                        result.status = 'EXPIRED';
+                        result.reason = 'Card has expired';
+                        this.results.declined.push(result);
+                    } else if (errorMessage.includes('stolen') || errorMessage.includes('fraud')) {
+                        result.status = 'STOLEN';
+                        result.reason = 'Card flagged as stolen/fraudulent';
+                        this.results.declined.push(result);
+                    } else if (errorMessage.includes('insufficient')) {
+                        result.status = 'INSUFFICIENT_FUNDS';
+                        result.reason = 'Insufficient funds';
+                        this.results.declined.push(result);
+                    } else if (errorMessage.includes('do_not_honor')) {
+                        result.status = 'DO_NOT_HONOR';
+                        result.reason = 'Card issuer declined transaction';
+                        this.results.declined.push(result);
+                    } else {
+                        result.status = 'DECLINED';
+                        result.reason = response.error || 'Unknown error';
+                        this.results.declined.push(result);
+                    }
+                    break;
             }
         }
         
-        this.logMessage(`${result.status}: ${this.maskCardNumber(result.cardNumber)} - ${result.reason}`);
+        // Enhanced logging with more details
+        const statusIcon = this.getStatusIcon(result.status);
+        this.logMessage(`${statusIcon} ${result.status}: ${this.maskCardNumber(result.cardNumber)} - ${result.reason}`);
+        
+        // Log additional details for errors
+        if (!response.success && result.details && result.details.suggestions.length > 0) {
+            this.logMessage(`💡 Suggestions: ${result.details.suggestions.join(', ')}`);
+        }
+    }
+    
+    getStatusIcon(status) {
+        const icons = {
+            'AUTHORIZED': '✅',
+            'CHARGED': '💰',
+            'VALID': '🟢',
+            'CVV_ISSUE': '🔒',
+            'EXPIRED': '⏰',
+            'STOLEN': '🚨',
+            'INSUFFICIENT_FUNDS': '💸',
+            'DO_NOT_HONOR': '⛔',
+            'DECLINED': '❌',
+            'KEY_ERROR': '🔑',
+            'PERMISSION_ERROR': '🚫',
+            'NETWORK_ERROR': '🌐'
+        };
+        return icons[status] || '❓';
     }
     
     generateCustomerData(holderName) {
