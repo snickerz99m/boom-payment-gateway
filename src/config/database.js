@@ -1,15 +1,12 @@
 const { Sequelize } = require('sequelize');
 const winston = require('winston');
+const path = require('path');
 require('dotenv').config();
 
 // Database configuration
+const dbDialect = process.env.DB_DIALECT || 'sqlite';
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'payments',
-  username: process.env.DB_USER || 'username',
-  password: process.env.DB_PASSWORD || 'password',
-  dialect: 'postgres',
+  dialect: dbDialect,
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   pool: {
     max: 10,
@@ -25,13 +22,30 @@ const dbConfig = {
   }
 };
 
+// Configure database based on dialect
+if (dbDialect === 'sqlite') {
+  dbConfig.storage = process.env.DB_PATH || path.join(__dirname, '../../data/payments.db');
+  dbConfig.database = 'payments';
+} else if (dbDialect === 'postgres') {
+  dbConfig.host = process.env.DB_HOST || 'localhost';
+  dbConfig.port = process.env.DB_PORT || 5432;
+  dbConfig.database = process.env.DB_NAME || 'payments';
+  dbConfig.username = process.env.DB_USER || 'username';
+  dbConfig.password = process.env.DB_PASSWORD || 'password';
+}
+
 // Create Sequelize instance
-const sequelize = new Sequelize(
-  dbConfig.database,
-  dbConfig.username,
-  dbConfig.password,
-  dbConfig
-);
+const sequelize = dbDialect === 'sqlite' 
+  ? new Sequelize({
+      ...dbConfig,
+      storage: dbConfig.storage
+    })
+  : new Sequelize(
+      dbConfig.database,
+      dbConfig.username,
+      dbConfig.password,
+      dbConfig
+    );
 
 // Test database connection
 const testConnection = async () => {

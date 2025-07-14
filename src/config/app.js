@@ -3,11 +3,12 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const winston = require('winston');
+const path = require('path');
 require('dotenv').config();
 
 // Import middleware
 const authMiddleware = require('../middleware/auth.middleware');
-const errorMiddleware = require('../middleware/error.middleware');
+const { errorHandler } = require('../middleware/error.middleware');
 const rateLimitMiddleware = require('../middleware/rateLimit.middleware');
 
 // Import routes
@@ -70,6 +71,17 @@ const createApp = () => {
   app.use(`/api/${apiVersion}/customers`, customerRoutes);
   app.use(`/api/${apiVersion}/webhooks`, webhookRoutes);
 
+  // Static file serving for admin panel
+  app.use('/admin', express.static(path.join(__dirname, '../../public/admin')));
+
+  // Static file serving for demo
+  app.use('/demo', express.static(path.join(__dirname, '../../public/demo')));
+
+  // Redirect root to admin panel
+  app.get('/', (req, res) => {
+    res.redirect('/admin');
+  });
+
   // 404 handler
   app.use('*', (req, res) => {
     res.status(404).json({
@@ -80,7 +92,7 @@ const createApp = () => {
   });
 
   // Error handling middleware (must be last)
-  app.use(errorMiddleware);
+  app.use(errorHandler);
 
   return app;
 };

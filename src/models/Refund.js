@@ -191,13 +191,13 @@ const Refund = sequelize.define('Refund', {
   timestamps: true,
   indexes: [
     {
-      fields: ['refundId']
+      fields: ['refund_id']
     },
     {
-      fields: ['transactionId']
+      fields: ['transaction_id']
     },
     {
-      fields: ['customerId']
+      fields: ['customer_id']
     },
     {
       fields: ['status']
@@ -206,19 +206,19 @@ const Refund = sequelize.define('Refund', {
       fields: ['reason']
     },
     {
-      fields: ['refundType']
+      fields: ['refund_type']
     },
     {
-      fields: ['initiatedBy']
+      fields: ['initiated_by']
     },
     {
-      fields: ['merchantId']
+      fields: ['merchant_id']
     },
     {
-      fields: ['createdAt']
+      fields: ['created_at']
     },
     {
-      fields: ['processingCompletedAt']
+      fields: ['processing_completed_at']
     }
   ]
 });

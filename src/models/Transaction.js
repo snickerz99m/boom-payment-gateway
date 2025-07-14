@@ -225,22 +225,22 @@ const Transaction = sequelize.define('Transaction', {
   timestamps: true,
   indexes: [
     {
-      fields: ['transactionId']
+      fields: ['transaction_id']
     },
     {
-      fields: ['customerId']
+      fields: ['customer_id']
     },
     {
-      fields: ['paymentMethodId']
+      fields: ['payment_method_id']
     },
     {
       fields: ['status']
     },
     {
-      fields: ['riskLevel']
+      fields: ['risk_level']
     },
     {
-      fields: ['cvvProvided']
+      fields: ['cvv_provided']
     },
     {
       fields: ['amount']
@@ -249,16 +249,16 @@ const Transaction = sequelize.define('Transaction', {
       fields: ['currency']
     },
     {
-      fields: ['merchantId']
+      fields: ['merchant_id']
     },
     {
-      fields: ['orderId']
+      fields: ['order_id']
     },
     {
-      fields: ['createdAt']
+      fields: ['created_at']
     },
     {
-      fields: ['processingCompletedAt']
+      fields: ['processing_completed_at']
     }
   ]
 });
