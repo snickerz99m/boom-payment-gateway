@@ -245,7 +245,7 @@ class EnhancedStripeBackend {
         
         // Execute payment with enhanced error handling
         try {
-            $response = $this->makeStripeRequest($stripeSecretKey, '/v1/payment_intents', $paymentData, $input);
+            $response = $this->makeStripeRequest($stripeSecretKey, '/v1/payment_intents', $paymentData, $input, 'POST');
             
             // Log successful payment processing
             $this->logMessage("Payment processing successful: " . ($response['id'] ?? 'unknown'));
@@ -333,7 +333,8 @@ class EnhancedStripeBackend {
             
             // Test key by making a simple API call to the balance endpoint
             // This is the recommended approach for validating Stripe keys
-            $response = $this->makeStripeRequest($stripeKey, '/v1/balance', [], []);
+            // IMPORTANT: Use GET method for /v1/balance endpoint
+            $response = $this->makeStripeRequest($stripeKey, '/v1/balance', [], [], 'GET');
             
             // Log successful validation with detailed information
             $this->logValidationResult($stripeKey, true, 'Key validation successful', $response);
@@ -639,7 +640,8 @@ class EnhancedStripeBackend {
                     $stripeKey, 
                     '/v1/payment_intents/' . $authResponse['id'] . '/capture', 
                     $captureData, 
-                    $input
+                    $input,
+                    'POST'
                 );
                 
                 return [
@@ -861,7 +863,7 @@ class EnhancedStripeBackend {
         $paymentData['amount'] = $input['operation'] === 'auth' ? 0 : $paymentData['amount'];
         $paymentData['capture'] = false; // Don't capture immediately
         
-        $response = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input);
+        $response = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input, 'POST');
         
         return [
             'success' => true,
@@ -881,7 +883,7 @@ class EnhancedStripeBackend {
     private function chargePayment($stripeKey, $paymentData, $input) {
         $paymentData['capture'] = true; // Capture immediately
         
-        $response = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input);
+        $response = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input, 'POST');
         
         return [
             'success' => true,
@@ -900,7 +902,7 @@ class EnhancedStripeBackend {
     private function authCapturePayment($stripeKey, $paymentData, $input) {
         // First authorize
         $paymentData['capture'] = false;
-        $authResponse = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input);
+        $authResponse = $this->makeStripeRequest($stripeKey, '/v1/payment_intents', $paymentData, $input, 'POST');
         
         // Then capture
         $captureData = ['amount_to_capture' => $paymentData['amount']];
@@ -908,7 +910,8 @@ class EnhancedStripeBackend {
             $stripeKey, 
             '/v1/payment_intents/' . $authResponse['id'] . '/capture', 
             $captureData, 
-            $input
+            $input,
+            'POST'
         );
         
         return [
@@ -926,7 +929,7 @@ class EnhancedStripeBackend {
     /**
      * Make secure request to Stripe API
      */
-    private function makeStripeRequest($stripeKey, $endpoint, $data, $input) {
+    private function makeStripeRequest($stripeKey, $endpoint, $data, $input, $method = 'POST') {
         $url = 'https://api.stripe.com' . $endpoint;
         
         // Get random user agent
@@ -943,11 +946,14 @@ class EnhancedStripeBackend {
         // Convert data to form format for Stripe API
         $postData = $this->buildQueryString($data);
         
+        // Log the request details for debugging
+        $this->logMessage("Making Stripe API request: $method $endpoint");
+        
         // Use proxy if configured
         if (!empty($input['proxyConfig']['host'])) {
-            return $this->makeProxyRequest($url, $postData, $headers, $input['proxyConfig']);
+            return $this->makeProxyRequest($url, $postData, $headers, $input['proxyConfig'], $method);
         } else {
-            return $this->makeDirectRequest($url, $postData, $headers);
+            return $this->makeDirectRequest($url, $postData, $headers, $method);
         }
     }
     
@@ -973,13 +979,11 @@ class EnhancedStripeBackend {
     /**
      * Make direct request to Stripe with enhanced error handling
      */
-    private function makeDirectRequest($url, $postData, $headers) {
+    private function makeDirectRequest($url, $postData, $headers, $method = 'POST') {
         $ch = curl_init();
         
-        curl_setopt_array($ch, [
+        $curlOptions = [
             CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postData,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -990,7 +994,27 @@ class EnhancedStripeBackend {
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_HEADER => true,
             CURLOPT_VERBOSE => false
-        ]);
+        ];
+        
+        // Configure request method
+        if ($method === 'POST') {
+            $curlOptions[CURLOPT_POST] = true;
+            if (!empty($postData)) {
+                $curlOptions[CURLOPT_POSTFIELDS] = $postData;
+            }
+        } else if ($method === 'GET') {
+            $curlOptions[CURLOPT_HTTPGET] = true;
+            // For GET requests, append data to URL if present
+            if (!empty($postData)) {
+                $curlOptions[CURLOPT_URL] = $url . '?' . $postData;
+            }
+        }
+        
+        // Log the full request details for debugging
+        $this->logMessage("cURL request: $method " . $curlOptions[CURLOPT_URL] . 
+                         ($method === 'POST' && !empty($postData) ? " with data: " . substr($postData, 0, 100) : ""));
+        
+        curl_setopt_array($ch, $curlOptions);
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -999,6 +1023,9 @@ class EnhancedStripeBackend {
         $info = curl_getinfo($ch);
         
         curl_close($ch);
+        
+        // Log the response details for debugging
+        $this->logMessage("cURL response: HTTP $httpCode" . ($error ? " Error: $error" : ""));
         
         // Enhanced error handling for network issues with detailed logging
         if ($response === false || !empty($error)) {
@@ -1093,13 +1120,11 @@ class EnhancedStripeBackend {
     /**
      * Make request through proxy
      */
-    private function makeProxyRequest($url, $postData, $headers, $proxyConfig) {
+    private function makeProxyRequest($url, $postData, $headers, $proxyConfig, $method = 'POST') {
         $ch = curl_init();
         
         $curlOptions = [
             CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $postData,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -1111,10 +1136,28 @@ class EnhancedStripeBackend {
             CURLOPT_PROXY => $proxyConfig['host'] . ':' . $proxyConfig['port']
         ];
         
+        // Configure request method
+        if ($method === 'POST') {
+            $curlOptions[CURLOPT_POST] = true;
+            if (!empty($postData)) {
+                $curlOptions[CURLOPT_POSTFIELDS] = $postData;
+            }
+        } else if ($method === 'GET') {
+            $curlOptions[CURLOPT_HTTPGET] = true;
+            // For GET requests, append data to URL if present
+            if (!empty($postData)) {
+                $curlOptions[CURLOPT_URL] = $url . '?' . $postData;
+            }
+        }
+        
         // Add proxy authentication if provided
         if (!empty($proxyConfig['username']) && !empty($proxyConfig['password'])) {
             $curlOptions[CURLOPT_PROXYUSERPWD] = $proxyConfig['username'] . ':' . $proxyConfig['password'];
         }
+        
+        // Log the proxy request details for debugging
+        $this->logMessage("Proxy request: $method " . $curlOptions[CURLOPT_URL] . 
+                         " via " . $proxyConfig['host'] . ':' . $proxyConfig['port']);
         
         curl_setopt_array($ch, $curlOptions);
         
@@ -1124,6 +1167,9 @@ class EnhancedStripeBackend {
         $info = curl_getinfo($ch);
         
         curl_close($ch);
+        
+        // Log the proxy response details for debugging
+        $this->logMessage("Proxy response: HTTP $httpCode" . ($error ? " Error: $error" : ""));
         
         // Enhanced error handling for proxy and network issues
         if ($response === false || !empty($error)) {
