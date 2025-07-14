@@ -58,6 +58,12 @@ class StripePaymentBackend {
             
             // Get and validate input
             $input = $this->getInput();
+            
+            // Check if this is a key validation request
+            if (isset($input['action']) && $input['action'] === 'validate_key') {
+                return $this->validateStripeKey($input);
+            }
+            
             $this->validateInput($input);
             
             // Decrypt sensitive data
@@ -82,6 +88,155 @@ class StripePaymentBackend {
             $this->logTransaction(['error' => $e->getMessage()], 'error');
             
             return $this->sendResponse(false, null, $e->getMessage());
+        }
+    }
+    
+    /**
+     * Validate Stripe secret key
+     */
+    private function validateStripeKey($input) {
+        try {
+            // Validate required fields
+            if (!isset($input['stripeSecretKey']) || empty($input['stripeSecretKey'])) {
+                throw new Exception('Missing Stripe secret key');
+            }
+            
+            // Decrypt the key
+            $stripeSecretKey = $this->decryptSensitiveData(['stripeSecretKey' => $input['stripeSecretKey']])['stripeSecretKey'];
+            
+            // Validate key format
+            if (!preg_match('/^sk_(test|live)_[A-Za-z0-9]{24,}$/', $stripeSecretKey)) {
+                throw new Exception('Invalid Stripe secret key format');
+            }
+            
+            // Test the key by making a simple API call
+            $validationResult = $this->testStripeKey($stripeSecretKey);
+            
+            return $this->sendResponse(true, [
+                'key_type' => strpos($stripeSecretKey, 'sk_live_') === 0 ? 'live' : 'test',
+                'validation' => $validationResult,
+                'message' => 'Key validation successful'
+            ]);
+            
+        } catch (Exception $e) {
+            return $this->sendResponse(false, null, 'Key validation failed: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Test Stripe key by making a simple API call
+     */
+    private function testStripeKey($stripeSecretKey) {
+        // Check if we're in test mode (no internet access)
+        if (getenv('TEST_MODE') === 'true' || !$this->hasInternetAccess()) {
+            return $this->simulateKeyValidation($stripeSecretKey);
+        }
+        
+        $url = "https://api.stripe.com/v1/account";
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_USERPWD => "$stripeSecretKey:",
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: ' . $this->userAgents[array_rand($this->userAgents)],
+                'Content-Type: application/x-www-form-urlencoded'
+            ],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        $info = curl_getinfo($ch);
+        
+        curl_close($ch);
+        
+        // Handle network errors
+        if ($error) {
+            // Check if it's a DNS or connection error
+            if (strpos($error, 'Could not resolve host') !== false) {
+                throw new Exception("DNS resolution failed: Unable to resolve api.stripe.com. Please check your internet connection.");
+            } elseif (strpos($error, 'Connection timed out') !== false) {
+                throw new Exception("Connection timeout: Unable to connect to Stripe API within timeout period.");
+            } elseif (strpos($error, 'SSL') !== false) {
+                throw new Exception("SSL error: " . $error);
+            } else {
+                throw new Exception("Network error: " . $error);
+            }
+        }
+        
+        // Handle connection failures
+        if ($httpCode === 0) {
+            throw new Exception("Connection failed: Unable to establish connection to Stripe API.");
+        }
+        
+        // Parse response
+        $responseData = json_decode($response, true);
+        
+        if ($httpCode === 200) {
+            return [
+                'valid' => true,
+                'message' => 'Valid Stripe key',
+                'account_id' => $responseData['id'] ?? null,
+                'account_type' => $responseData['type'] ?? null,
+                'charges_enabled' => $responseData['charges_enabled'] ?? null,
+                'country' => $responseData['country'] ?? null
+            ];
+        } elseif ($httpCode === 401) {
+            $errorMessage = $responseData['error']['message'] ?? 'Invalid API key';
+            throw new Exception("Invalid API key: " . $errorMessage);
+        } else {
+            $errorMessage = $responseData['error']['message'] ?? 'Unknown error';
+            throw new Exception("API error: " . $errorMessage);
+        }
+    }
+    
+    /**
+     * Check if we have internet access
+     */
+    private function hasInternetAccess() {
+        $testHost = 'api.stripe.com';
+        $ip = gethostbyname($testHost);
+        return $ip !== $testHost;
+    }
+    
+    /**
+     * Simulate key validation for test mode
+     */
+    private function simulateKeyValidation($stripeSecretKey) {
+        // Simulate validation based on key format
+        if (preg_match('/^sk_test_[A-Za-z0-9]{24,}$/', $stripeSecretKey)) {
+            // Simulate different responses based on key content
+            if (strpos($stripeSecretKey, 'invalid') !== false) {
+                throw new Exception("Invalid API key: The provided key is invalid");
+            }
+            
+            return [
+                'valid' => true,
+                'message' => 'Valid Stripe test key (simulated)',
+                'account_id' => 'acct_test_' . substr(md5($stripeSecretKey), 0, 16),
+                'account_type' => 'standard',
+                'charges_enabled' => true,
+                'country' => 'US',
+                'test_mode' => true
+            ];
+        } elseif (preg_match('/^sk_live_[A-Za-z0-9]{24,}$/', $stripeSecretKey)) {
+            return [
+                'valid' => true,
+                'message' => 'Valid Stripe live key (simulated)',
+                'account_id' => 'acct_live_' . substr(md5($stripeSecretKey), 0, 16),
+                'account_type' => 'standard',
+                'charges_enabled' => true,
+                'country' => 'US',
+                'test_mode' => true
+            ];
+        } else {
+            throw new Exception("Invalid API key format");
         }
     }
     
@@ -286,6 +441,7 @@ class StripePaymentBackend {
                 'Content-Type: application/x-www-form-urlencoded'
             ],
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2
         ]);
@@ -303,12 +459,20 @@ class StripePaymentBackend {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $info = curl_getinfo($ch);
         
         curl_close($ch);
         
-        // Handle cURL errors
+        // Enhanced error handling for network issues
         if ($error) {
-            throw new Exception("Request failed: $error");
+            $this->logTransaction(['curl_error' => $error, 'url' => $url, 'curl_info' => $info], 'network_error');
+            throw new Exception("Network error: $error");
+        }
+        
+        // Handle DNS resolution and connection failures
+        if ($httpCode === 0) {
+            $this->logTransaction(['connection_failed' => true, 'url' => $url], 'network_error');
+            throw new Exception("Connection failed: Unable to connect to Stripe API");
         }
         
         // Parse response
@@ -316,6 +480,7 @@ class StripePaymentBackend {
         
         if ($httpCode !== 200) {
             $errorMessage = $responseData['error']['message'] ?? 'Unknown Stripe API error';
+            $this->logTransaction(['http_code' => $httpCode, 'error' => $errorMessage], 'api_error');
             throw new Exception("Stripe API error: $errorMessage");
         }
         

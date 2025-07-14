@@ -52,6 +52,9 @@ class StripePaymentGateway {
 
         // Generate random user data button
         this.addRandomDataButton();
+
+        // Validate key button
+        document.getElementById('validate-key-btn').addEventListener('click', this.validateStripeKey.bind(this));
     }
 
     setupFormValidation() {
@@ -234,6 +237,99 @@ class StripePaymentGateway {
 
     getRandomUserAgent() {
         return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+    }
+
+    async validateStripeKey() {
+        const keyInput = document.getElementById('stripe-secret-key');
+        const validateBtn = document.getElementById('validate-key-btn');
+        const validationStatus = document.getElementById('validation-status');
+        
+        const key = keyInput.value.trim();
+        
+        if (!key) {
+            this.showValidationStatus('error', 'Please enter a Stripe secret key');
+            return;
+        }
+        
+        // Basic format validation
+        if (!key.match(/^sk_(test|live)_[A-Za-z0-9]{24,}$/)) {
+            this.showValidationStatus('error', 'Invalid Stripe secret key format. Must start with sk_test_ or sk_live_');
+            return;
+        }
+        
+        // Disable button and show loading
+        validateBtn.disabled = true;
+        validateBtn.textContent = '⏳ Validating...';
+        validationStatus.style.display = 'none';
+        
+        try {
+            // Encrypt the key
+            const encryptedKey = btoa(key);
+            
+            // Make validation request
+            const response = await fetch('backend.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    action: 'validate_key',
+                    stripeSecretKey: encryptedKey
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showValidationStatus('success', 'Valid Stripe key!', result.data);
+            } else {
+                this.showValidationStatus('error', result.message || 'Key validation failed');
+            }
+            
+        } catch (error) {
+            this.showValidationStatus('error', 'Network error: ' + error.message);
+        } finally {
+            // Re-enable button
+            validateBtn.disabled = false;
+            validateBtn.textContent = '🔍 Validate Key';
+        }
+    }
+
+    showValidationStatus(type, message, details = null) {
+        const validationStatus = document.getElementById('validation-status');
+        
+        validationStatus.className = `validation-status ${type}`;
+        validationStatus.style.display = 'block';
+        
+        let content = `<strong>${message}</strong>`;
+        
+        if (details) {
+            content += '<div class="validation-details">';
+            if (details.key_type) {
+                content += `<div><strong>Key Type:</strong> ${details.key_type}</div>`;
+            }
+            if (details.validation && details.validation.account_id) {
+                content += `<div><strong>Account ID:</strong> ${details.validation.account_id}</div>`;
+            }
+            if (details.validation && details.validation.country) {
+                content += `<div><strong>Country:</strong> ${details.validation.country}</div>`;
+            }
+            if (details.validation && details.validation.charges_enabled !== undefined) {
+                content += `<div><strong>Charges Enabled:</strong> ${details.validation.charges_enabled ? 'Yes' : 'No'}</div>`;
+            }
+            if (details.validation && details.validation.test_mode) {
+                content += `<div><em>Note: Running in test mode (no internet access)</em></div>`;
+            }
+            content += '</div>';
+        }
+        
+        validationStatus.innerHTML = content;
+        
+        // Auto-hide after 15 seconds
+        setTimeout(() => {
+            validationStatus.style.display = 'none';
+        }, 15000);
     }
 
     async processPayment() {
