@@ -82,7 +82,8 @@ dist
 
 # Gatsby files
 .cache/
-public
+# We want to keep our admin panel
+# public
 
 # Serverless directories
 .serverless
