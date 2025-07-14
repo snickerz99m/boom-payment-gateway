@@ -350,7 +350,7 @@ class EnhancedStripeBackend {
             
             // Test key by making a simple API call to the balance endpoint
             // This is the recommended approach for validating Stripe keys
-            // IMPORTANT: Use GET method for /v1/balance endpoint
+            // IMPORTANT: Use GET method for /v1/balance endpoint with no payload
             $response = $this->makeStripeRequest($stripeKey, '/v1/balance', [], [], 'GET');
             
             // Log successful validation with detailed information
@@ -425,7 +425,7 @@ class EnhancedStripeBackend {
      * Parse Stripe error message to extract meaningful information
      */
     private function parseStripeError($errorMessage) {
-        // Common Stripe error patterns
+        // Common Stripe error patterns with more comprehensive matching
         $errorPatterns = [
             'Invalid API Key' => [
                 'code' => 'invalid_api_key',
@@ -471,6 +471,61 @@ class EnhancedStripeBackend {
                 'code' => 'timeout_error',
                 'type' => 'network_error',
                 'message' => 'Request timed out - Check network connection and try again'
+            ],
+            'Connection timed out' => [
+                'code' => 'connection_timeout',
+                'type' => 'network_error',
+                'message' => 'Connection timed out - Check network connection'
+            ],
+            'DNS resolution failed' => [
+                'code' => 'dns_error',
+                'type' => 'network_error',
+                'message' => 'DNS resolution failed - Unable to resolve api.stripe.com'
+            ],
+            'Network error' => [
+                'code' => 'network_error',
+                'type' => 'network_error',
+                'message' => 'Network error - Check internet connection'
+            ],
+            'Unable to decode' => [
+                'code' => 'invalid_key_format',
+                'type' => 'authentication_error',
+                'message' => 'Invalid key format - Unable to decode key'
+            ],
+            'HTTP Status: 401' => [
+                'code' => 'unauthorized',
+                'type' => 'authentication_error',
+                'message' => 'Unauthorized - Invalid API key or insufficient permissions'
+            ],
+            'HTTP Status: 403' => [
+                'code' => 'forbidden',
+                'type' => 'permission_error',
+                'message' => 'Forbidden - Access denied, check account permissions'
+            ],
+            'HTTP Status: 404' => [
+                'code' => 'not_found',
+                'type' => 'api_error',
+                'message' => 'Not found - API endpoint not found'
+            ],
+            'HTTP Status: 429' => [
+                'code' => 'rate_limit_exceeded',
+                'type' => 'api_error',
+                'message' => 'Rate limit exceeded - Too many requests'
+            ],
+            'HTTP Status: 500' => [
+                'code' => 'server_error',
+                'type' => 'api_error',
+                'message' => 'Stripe server error - Try again later'
+            ],
+            'HTTP Status: 502' => [
+                'code' => 'bad_gateway',
+                'type' => 'network_error',
+                'message' => 'Bad gateway - Stripe service temporarily unavailable'
+            ],
+            'HTTP Status: 503' => [
+                'code' => 'service_unavailable',
+                'type' => 'network_error',
+                'message' => 'Service unavailable - Stripe temporarily unavailable'
             ]
         ];
         
@@ -1005,14 +1060,18 @@ class EnhancedStripeBackend {
             'Stripe-Version: 2023-10-16'
         ];
         
-        // Convert data to form format for Stripe API
-        $postData = $this->buildQueryString($data);
+        // Convert data to form format for Stripe API only if there's data
+        $postData = '';
+        if (!empty($data)) {
+            $postData = $this->buildQueryString($data);
+        }
         
         // Log the request details for debugging
-        $this->logMessage("Making Stripe API request: $method $endpoint");
+        $this->logMessage("Making Stripe API request: $method $endpoint" . 
+                          (!empty($postData) ? " with data" : " (no data)"));
         
         // Use proxy if configured
-        if (!empty($input['proxyConfig']['host'])) {
+        if (is_array($input) && !empty($input['proxyConfig']['host'])) {
             return $this->makeProxyRequest($url, $postData, $headers, $input['proxyConfig'], $method);
         } else {
             return $this->makeDirectRequest($url, $postData, $headers, $method);
@@ -1070,6 +1129,7 @@ class EnhancedStripeBackend {
             if (!empty($postData)) {
                 $curlOptions[CURLOPT_URL] = $url . '?' . $postData;
             }
+            // IMPORTANT: Do NOT set CURLOPT_POSTFIELDS for GET requests
         }
         
         // Log the full request details for debugging
@@ -1210,6 +1270,7 @@ class EnhancedStripeBackend {
             if (!empty($postData)) {
                 $curlOptions[CURLOPT_URL] = $url . '?' . $postData;
             }
+            // IMPORTANT: Do NOT set CURLOPT_POSTFIELDS for GET requests
         }
         
         // Add proxy authentication if provided
