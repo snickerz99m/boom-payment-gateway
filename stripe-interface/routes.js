@@ -51,7 +51,9 @@ router.post('/api/stripe/process', async (req, res) => {
             proxyConfig,
             description,
             userAgent,
-            sessionId
+            sessionId,
+            delayTime,
+            threadCount
         } = req.body;
         
         // Validate required fields
