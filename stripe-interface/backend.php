@@ -140,9 +140,21 @@ class EnhancedStripeBackend {
     }
     
     /**
-     * Process Stripe payment with enhanced validation and error handling
+     * Process payment with threading and delay support
      */
     private function processPayment($input) {
+        // Get threads and delay configuration
+        $threadsConfig = $this->getThreadsConfig($input);
+        $delayConfig = $this->getDelayConfig($input);
+        
+        // Log processing configuration
+        $this->logMessage("Processing with {$threadsConfig['threads']} threads and {$delayConfig['delay']}ms delay");
+        
+        // Apply delay if configured
+        if ($delayConfig['delay'] > 0) {
+            usleep($delayConfig['delay'] * 1000); // Convert ms to microseconds
+        }
+        
         // Decrypt Stripe secret key
         $stripeSecretKey = $this->decryptData($input['stripeSecretKey']);
         
@@ -192,7 +204,9 @@ class EnhancedStripeBackend {
                 'operation_type' => $input['operation'],
                 'processing_time' => date('Y-m-d H:i:s'),
                 'key_type' => $this->getKeyType($stripeSecretKey),
-                'ip_address' => $_SERVER['REMOTE_ADDR']
+                'ip_address' => $_SERVER['REMOTE_ADDR'],
+                'threads_config' => $threadsConfig['threads'],
+                'delay_config' => $delayConfig['delay']
             ]
         ];
         
@@ -231,13 +245,61 @@ class EnhancedStripeBackend {
     }
     
     /**
+     * Get threads configuration from input
+     */
+    private function getThreadsConfig($input) {
+        $defaultThreads = 1;
+        $maxThreads = 10;
+        
+        $threads = isset($input['threadsConfig']['threads']) ? 
+            (int)$input['threadsConfig']['threads'] : $defaultThreads;
+        
+        // Validate threads range
+        if ($threads < 1) {
+            $threads = 1;
+        } elseif ($threads > $maxThreads) {
+            $threads = $maxThreads;
+        }
+        
+        return [
+            'threads' => $threads,
+            'max_threads' => $maxThreads,
+            'default_threads' => $defaultThreads
+        ];
+    }
+    
+    /**
+     * Get delay configuration from input
+     */
+    private function getDelayConfig($input) {
+        $defaultDelay = 0;
+        $maxDelay = 10000; // 10 seconds max
+        
+        $delay = isset($input['delayConfig']['delay']) ? 
+            (int)$input['delayConfig']['delay'] : $defaultDelay;
+        
+        // Validate delay range
+        if ($delay < 0) {
+            $delay = 0;
+        } elseif ($delay > $maxDelay) {
+            $delay = $maxDelay;
+        }
+        
+        return [
+            'delay' => $delay,
+            'max_delay' => $maxDelay,
+            'default_delay' => $defaultDelay
+        ];
+    }
+    
+    /**
      * Validate if Stripe key is alive and has proper permissions
      */
     private function validateStripeKeyAlive($stripeKey) {
         try {
-            // Test key by making a simple API call to the charges endpoint
-            // This is the recommended approach for validating sk_live keys
-            $response = $this->makeStripeRequest($stripeKey, '/v1/charges', [], []);
+            // Test key by making a simple API call to the balance endpoint
+            // This is the recommended approach for validating Stripe keys
+            $response = $this->makeStripeRequest($stripeKey, '/v1/balance', [], []);
             
             // Log successful validation with detailed information
             $this->logValidationResult($stripeKey, true, 'Key validation successful', $response);
@@ -245,7 +307,7 @@ class EnhancedStripeBackend {
             return [
                 'valid' => true,
                 'message' => 'Valid Stripe key with proper permissions',
-                'endpoint_tested' => '/v1/charges',
+                'endpoint_tested' => '/v1/balance',
                 'key_type' => $this->getKeyType($stripeKey),
                 'response_received' => true,
                 'timestamp' => date('Y-m-d H:i:s')
@@ -263,7 +325,7 @@ class EnhancedStripeBackend {
                 'http_status' => $httpStatus,
                 'response_body' => $responseBody,
                 'error_details' => $errorDetails,
-                'endpoint_tested' => '/v1/charges',
+                'endpoint_tested' => '/v1/balance',
                 'timestamp' => date('Y-m-d H:i:s')
             ]);
             
@@ -274,7 +336,7 @@ class EnhancedStripeBackend {
                 'error_type' => $errorDetails['type'],
                 'http_status' => $httpStatus,
                 'response_body' => $responseBody,
-                'endpoint_tested' => '/v1/charges',
+                'endpoint_tested' => '/v1/balance',
                 'raw_error' => $e->getMessage(),
                 'timestamp' => date('Y-m-d H:i:s')
             ];
@@ -390,7 +452,7 @@ class EnhancedStripeBackend {
         if ($success) {
             // For successful validations, log basic response info
             $logEntry['response_summary'] = [
-                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/charges',
+                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/balance',
                 'response_received' => $response['response_received'] ?? true,
                 'timestamp' => $response['timestamp'] ?? date('Y-m-d H:i:s')
             ];
@@ -400,7 +462,7 @@ class EnhancedStripeBackend {
                 'http_status' => $response['http_status'] ?? null,
                 'response_body' => $response['response_body'] ?? null,
                 'error_details' => $response['error_details'] ?? null,
-                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/charges',
+                'endpoint_tested' => $response['endpoint_tested'] ?? '/v1/balance',
                 'timestamp' => $response['timestamp'] ?? date('Y-m-d H:i:s')
             ];
             
